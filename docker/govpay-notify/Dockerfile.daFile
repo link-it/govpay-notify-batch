@@ -1,0 +1,75 @@
+FROM eclipse-temurin:21-jre-alpine
+
+ARG govpay_notify_fullversion=local
+ARG govpay_notify_home=/opt/govpay-notify
+ARG govpay_notify_log=/var/log/govpay-notify
+
+LABEL maintainer="Link.it s.r.l."
+LABEL description="GovPay NOTIFY (Verifica attivazione NOTIFY) Batch Processor - Local Build"
+LABEL govpay.notify.version="${govpay_notify_fullversion}"
+USER root
+
+ENV GOVPAY_NOTIFY_FULLVERSION=${govpay_notify_fullversion} \
+GOVPAY_NOTIFY_LOGDIR=${govpay_notify_log} \
+GOVPAY_NOTIFY_HOME=${govpay_notify_home} \
+HSQLDB_FULLVERSION=2.7.4 \
+TZ=Europe/Rome
+
+
+RUN set -eux; \
+apk update; \
+apk upgrade; \
+apk add --no-cache bash curl tar unzip netcat-openbsd tzdata; \
+rm -rf /var/cache/apk/*; \
+echo "${TZ}" > /etc/timezone; \
+addgroup -S govpay ; \
+adduser -S -G govpay govpay; \
+mkdir -p ${GOVPAY_NOTIFY_HOME} ${GOVPAY_NOTIFY_LOGDIR} /opt/sql /opt/jdbc-drivers; \
+chown -R govpay:govpay ${GOVPAY_NOTIFY_HOME} ${GOVPAY_NOTIFY_LOGDIR} /opt/sql
+
+WORKDIR ${GOVPAY_NOTIFY_HOME}
+
+# Copy JAR from local build (buildcontext/)
+COPY govpay-notify-batch.jar ${GOVPAY_NOTIFY_HOME}/govpay-notify-batch.jar
+
+# Copy SQL scripts (buildcontext/)
+COPY sql /opt/sql
+
+# Download HSQLDB
+RUN set -eux; \
+chown govpay:govpay ${GOVPAY_NOTIFY_HOME}/govpay-notify-batch.jar; \
+chown -R govpay:govpay /opt/sql; \
+curl -kL -sS -q -o /var/tmp/hsqldb-${HSQLDB_FULLVERSION}.zip https://sourceforge.net/projects/hsqldb/files/hsqldb/hsqldb_2_7/hsqldb-${HSQLDB_FULLVERSION}.zip/download; \
+unzip -q -d /opt /var/tmp/hsqldb-${HSQLDB_FULLVERSION}.zip hsqldb-${HSQLDB_FULLVERSION}/hsqldb/lib/*; \
+rm -f /var/tmp/hsqldb-${HSQLDB_FULLVERSION}.zip
+
+# Copy entrypoint and initialization scripts
+COPY commons/entrypoint.sh commons/init_notify_db.sh /usr/local/bin/
+RUN chown -R govpay:0 /usr/local/bin/entrypoint.sh /usr/local/bin/init_notify_db.sh ${GOVPAY_NOTIFY_HOME} ${GOVPAY_NOTIFY_LOGDIR} /opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb /opt/sql \
+&& chmod -Rf g+rwX ${GOVPAY_NOTIFY_HOME} ${GOVPAY_NOTIFY_LOGDIR} /opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb/ /opt/sql/ \
+&& chmod ug=rx /usr/local/bin/entrypoint.sh /usr/local/bin/init_notify_db.sh
+
+
+USER govpay
+
+ENV SPRING_BATCH_JOB_ENABLED=false \
+    GOVPAY_BATCH_ENABLED=true \
+    GOVPAY_BATCH_THREAD_POOL_SIZE=5 \
+    GOVPAY_BATCH_HEADERS_CHUNK_SIZE=1 \
+    GOVPAY_BATCH_METADATA_CHUNK_SIZE=100 \
+    GOVPAY_BATCH_PAYMENTS_CHUNK_SIZE=50 \
+    GOVPAY_BATCH_SKIP_LIMIT=10 \
+    GOVPAY_BATCH_STALE_THRESHOLD_MINUTES=120 \
+    MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
+    SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=20000 \
+    SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT=10000 \
+    SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=600000 \
+    SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=2 \
+    SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10 \
+    LOGGING_FILE_NAME=${GOVPAY_NOTIFY_LOGDIR}/govpay-notify.log \
+    LOGGING_DIRECTORYPATH=${GOVPAY_NOTIFY_LOGDIR} \
+    LOGGING_FILEPREFIX=govpay-notify
+
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD []
