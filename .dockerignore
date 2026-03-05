@@ -1,0 +1,66 @@
+# Maven build artifacts
+target/
+!target/*.jar
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (except CLAUDE.md which might be useful)
+*.md
+!CLAUDE.md
+docs/
+
+# Test files
+src/test/
+*Test.java
+*Tests.java
+
+# CI/CD (will be copied separately if needed)
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Local configuration
+application-local.properties
+*.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+
+# Maven wrapper (if not needed in image)
+.mvn/
+mvnw
+mvnw.cmd
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Docker files (don't copy into build context recursively)
+Dockerfile*
+docker-compose*.yml
+
+# Backup files
+*.backup
+*.old

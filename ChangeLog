@@ -1,0 +1,6 @@
+2026-03-03  Giuliano Pintori <pintori@link.it>
+
+	* [ProjectSetup]
+	Creazione repository
+	Creato repository iniziale per il progetto govpay-notify-batch.
+	Importata pipeline di validazione e rilascio CI/CD dal progetto govpay-notify-batch.
