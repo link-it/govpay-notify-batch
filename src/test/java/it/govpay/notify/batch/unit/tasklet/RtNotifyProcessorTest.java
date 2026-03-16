@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
 import it.govpay.notify.batch.dto.RtNotifyBatch;
@@ -54,8 +55,10 @@ class RtNotifyProcessorTest {
         @Test
         @DisplayName("should return batch with OK esito when service succeeds")
         void shouldReturnBatchWithOkEsitoWhenSuccess() throws Exception {
-            when(enteApiService.notifyRendicontazione(eq(context), any(CompletableFuture.class)))
-                    .thenReturn(null);
+            doAnswer(invocation -> {
+                invocation.<CompletableFuture<HttpStatusCode>>getArgument(1).complete(HttpStatus.OK);
+                return null;
+            }).when(enteApiService).notifyRendicontazione(eq(context), any(CompletableFuture.class));
 
             RtNotifyBatch result = processor.process(context);
 
@@ -84,8 +87,10 @@ class RtNotifyProcessorTest {
         @Test
         @DisplayName("should always return a batch (never null)")
         void shouldAlwaysReturnBatch() throws Exception {
-            when(enteApiService.notifyRendicontazione(eq(context), any(CompletableFuture.class)))
-                    .thenReturn(null);
+            doAnswer(invocation -> {
+                invocation.<CompletableFuture<HttpStatusCode>>getArgument(1).complete(HttpStatus.OK);
+                return null;
+            }).when(enteApiService).notifyRendicontazione(eq(context), any(CompletableFuture.class));
 
             RtNotifyBatch result = processor.process(context);
 

@@ -174,7 +174,7 @@ public class EnteApiService {
 		} catch (JsonProcessingException e) {
 			dataEnd = OffsetDateTime.now(ZoneOffset.UTC);
 			log.error("Errore durante la notifica della ricevuta: taxCode {} - iur {} - iuv {}", rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv(), e);
-			statusCodeFuture.complete(HttpStatus.INTERNAL_SERVER_ERROR);
+			statusCodeFuture.complete(HttpStatus.BAD_REQUEST);
 			gdeService.saveNotifyRndKo(rtInfo, jsonRequest, response, null, dataStart, dataEnd, enteBaseUrl);
 			return "Fail to convert object to json";
 		}

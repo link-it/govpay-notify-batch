@@ -38,7 +38,7 @@ class RtNotifyWriterTest {
     class WriteTest {
 
         @Test
-        @DisplayName("should call registerNotificaRt for each batch item")
+        @DisplayName("should call registerNotificaRt only for OK items")
         void shouldCallRegisterNotificaRtForEachItem() throws Exception {
             RtNotifyBatch batch1 = RtNotifyBatch.builder().rtId(10L).esito("OK").build();
             RtNotifyBatch batch2 = RtNotifyBatch.builder().rtId(20L).esito("KO").message("error").build();
@@ -46,12 +46,12 @@ class RtNotifyWriterTest {
             writer.write(new Chunk<>(Arrays.asList(batch1, batch2)));
 
             verify(rendicontazioniRepository).registerNotificaRt(10L);
-            verify(rendicontazioniRepository).registerNotificaRt(20L);
+            verify(rendicontazioniRepository, never()).registerNotificaRt(20L);
         }
 
         @Test
-        @DisplayName("should register KO items too")
-        void shouldRegisterKoItems() throws Exception {
+        @DisplayName("should not register KO items")
+        void shouldNotRegisterKoItems() throws Exception {
             RtNotifyBatch batch = RtNotifyBatch.builder()
                     .rtId(10L)
                     .esito("KO")
@@ -60,7 +60,7 @@ class RtNotifyWriterTest {
 
             writer.write(new Chunk<>(Arrays.asList(batch)));
 
-            verify(rendicontazioniRepository).registerNotificaRt(10L);
+            verifyNoInteractions(rendicontazioniRepository);
         }
 
         @Test

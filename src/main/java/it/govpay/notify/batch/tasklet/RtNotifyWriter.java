@@ -34,9 +34,10 @@ public class RtNotifyWriter implements ItemWriter<RtNotifyBatch> {
             if (batch == null)
                 log.info("Internal error: no notify processor output");
             else {
-                rendicontazioniRepository.registerNotificaRt(batch.getRtId());
                 if (batch.getMessage() != null)
                     log.info(batch.getMessage());
+                if (batch.getEsito() != null && batch.getEsito().equals("OK"))
+                	rendicontazioniRepository.registerNotificaRt(batch.getRtId());
                 if (batch.getNotifyTime() != null)
                     log.info("Ricevuta notificata: id {} ", batch.getRtId());
             }

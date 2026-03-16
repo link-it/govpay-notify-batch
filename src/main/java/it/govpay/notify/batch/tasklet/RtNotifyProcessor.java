@@ -34,9 +34,10 @@ public class RtNotifyProcessor implements ItemProcessor<RtNotifyContext, RtNotif
 
         CompletableFuture<HttpStatusCode> statusCodeFuture = new CompletableFuture<>();
         String msg = enteApiService.notifyRendicontazione(context, statusCodeFuture);
+        String esito = (statusCodeFuture.isDone() && (statusCodeFuture.get().is2xxSuccessful() || statusCodeFuture.get().is4xxClientError()) ? "OK" : "KO");
         return RtNotifyBatch.builder()
                               .rtId(context.getRtId())
-                              .esito(msg == null ? "OK" : "KO")
+                              .esito(esito)
                               .notifyTime(LocalDateTime.now())
                               .message(msg)
                               .build();
