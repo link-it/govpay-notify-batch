@@ -14,6 +14,11 @@
 	Driver JDBC (postgresql, h2, ojdbc11, mysql-connector-j, mssql-jdbc) portati a scope provided ed esclusi esplicitamente dallo spring-boot-maven-plugin.
 	Layout del fat JAR impostato a ZIP (PropertiesLauncher) per consentire il caricamento dei driver tramite loader.path esterno.
 
+	* [Pipeline]
+	Aggiunta eccezione di licenza GPLv3 per govpay-ec-client
+	Aggiunta voce in license-exceptions.json per la libreria interna govpay-ec-client (GPLv3), allineata a quella gia' presente per govpay-common.
+	Corretto inoltre il riferimento al progetto nella motivazione di govpay-common (govpay-fdr-batch -> govpay-notify-batch).
+
 2026-05-04  Giuliano Pintori <pintori@link.it>
 
 	* [Pipeline]
