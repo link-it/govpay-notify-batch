@@ -4,6 +4,16 @@
 	Aggiornata versione del govpay-common a 1.1.2.
 	Aggiornata versione del govpay-ec-client a 1.0.0.
 
+	* [Pipeline]
+	Aggiunta generazione SBOM
+	Aggiunto job sbom in pipeline per la generazione dell'SBOM in formato CycloneDX (json + xml) tramite cyclonedx-maven-plugin.
+	L'SBOM viene pubblicato come artifact (sbom-report) e incluso nello ZIP dei report di release.
+
+	* [Build]
+	Esclusi i driver JDBC dal fat JAR
+	Driver JDBC (postgresql, h2, ojdbc11, mysql-connector-j, mssql-jdbc) portati a scope provided ed esclusi esplicitamente dallo spring-boot-maven-plugin.
+	Layout del fat JAR impostato a ZIP (PropertiesLauncher) per consentire il caricamento dei driver tramite loader.path esterno.
+
 2026-05-04  Giuliano Pintori <pintori@link.it>
 
 	* [Pipeline]
