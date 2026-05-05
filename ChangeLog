@@ -1,3 +1,9 @@
+2026-05-05  Giuliano Pintori <pintori@link.it>
+
+	* [Dependencies]
+	Aggiornata versione del govpay-common a 1.1.2.
+	Aggiornata versione del govpay-ec-client a 1.0.0.
+
 2026-05-04  Giuliano Pintori <pintori@link.it>
 
 	* [Pipeline]
