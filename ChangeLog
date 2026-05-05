@@ -1,3 +1,37 @@
+2026-05-05  Giuliano Pintori <pintori@link.it>
+
+	* [Dependencies]
+	Aggiornata versione del govpay-common a 1.1.2.
+	Aggiornata versione del govpay-ec-client a 1.0.0.
+
+	* [Pipeline]
+	Aggiunta generazione SBOM
+	Aggiunto job sbom in pipeline per la generazione dell'SBOM in formato CycloneDX (json + xml) tramite cyclonedx-maven-plugin.
+	L'SBOM viene pubblicato come artifact (sbom-report) e incluso nello ZIP dei report di release.
+
+	* [Build]
+	Esclusi i driver JDBC dal fat JAR
+	Driver JDBC (postgresql, h2, ojdbc11, mysql-connector-j, mssql-jdbc) portati a scope provided ed esclusi esplicitamente dallo spring-boot-maven-plugin.
+	Layout del fat JAR impostato a ZIP (PropertiesLauncher) per consentire il caricamento dei driver tramite loader.path esterno.
+
+	* [Pipeline]
+	Aggiunta eccezione di licenza GPLv3 per govpay-ec-client
+	Aggiunta voce in license-exceptions.json per la libreria interna govpay-ec-client (GPLv3), allineata a quella gia' presente per govpay-common.
+	Corretto inoltre il riferimento al progetto nella motivazione di govpay-common (govpay-fdr-batch -> govpay-notify-batch).
+
+2026-05-04  Giuliano Pintori <pintori@link.it>
+
+	* [Pipeline]
+	Allineamento pipeline a govpay-fdr-batch
+	Aggiornate le versioni delle action (checkout v6, setup-java v5, cache v5, upload/download-artifact v7).
+	Cache OWASP basata sulla data con skip di -DautoUpdate quando la cache è hit.
+	Aggiunto job osv-scan (Google OSV Scanner) per la scansione vulnerabilità su push/main e tag.
+	Riorganizzato il job release: report (OWASP, JaCoCo, OSV, licenze) accorpati in un unico ZIP.
+	Aggiunto workflow refresh-owasp-db.yml per il refresh notturno del DB NVD.
+
+	* [Dependencies]
+	Aggiornata versione del govpay-bom a 1.1.3.
+
 2026-03-03  Giuliano Pintori <pintori@link.it>
 
 	* [ProjectSetup]

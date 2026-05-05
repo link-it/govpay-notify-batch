@@ -3,7 +3,12 @@
     {
       "groupId": "org.gov4j.govpay",
       "artifactId": "govpay-common",
-      "reason": "Libreria interna del progetto GovPay, rilasciata sotto GPLv3. Compatibile in quanto anche govpay-fdr-batch e' distribuito sotto GPLv3."
+      "reason": "Libreria interna del progetto GovPay, rilasciata sotto GPLv3. Compatibile in quanto anche govpay-notify-batch e' distribuito sotto GPLv3."
+    },
+    {
+      "groupId": "org.gov4j.govpay",
+      "artifactId": "govpay-ec-client",
+      "reason": "Libreria interna del progetto GovPay, rilasciata sotto GPLv3. Compatibile in quanto anche govpay-notify-batch e' distribuito sotto GPLv3."
     }
   ]
 }
