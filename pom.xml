@@ -94,6 +94,19 @@
 		</profile>
 	</profiles>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- Override Netty BOM per fix CVE GHSA-v8h7-rr48-vmmv (netty-codec-http < 4.1.133.Final) -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.133.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <!-- GovPay Common Library -->
         <dependency>
