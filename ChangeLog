@@ -1,3 +1,9 @@
+2026-05-06  Giuliano Pintori <pintori@link.it>
+
+	* [Security]
+	Fix CVE GHSA-v8h7-rr48-vmmv su netty-codec-http
+	Importato netty-bom 4.1.133.Final in dependencyManagement per allineare tutti i moduli Netty alla versione che corregge la vulnerabilita' (CVSS 5.3) segnalata da OSV Scanner sulla 4.1.132.Final.
+
 2026-05-05  Giuliano Pintori <pintori@link.it>
 
 	* [Dependencies]
