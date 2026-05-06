@@ -5,7 +5,7 @@
 
 	* [Test]
 	Estesa la copertura dei test
-	Aggiunti unit test per i deserializer/serializer (LocalDateFlexibleDeserializer, OffsetDateTimeDeserializer, OffsetDateTimeSerializer), per le configurazioni (EnteApiClientConfig, TimezoneConfig, CronJobRunner, ScheduledJobRunner), per il BatchController e per i path preflight/clearCache di EnteApiService. Estesa anche la copertura di EventoRtMapper sulla copia degli header di risposta.
+	Aggiunti unit test per i deserializer/serializer (LocalDateFlexibleDeserializer, OffsetDateTimeDeserializer, OffsetDateTimeSerializer), per le configurazioni (BatchJobConfiguration, EnteApiClientConfig, TimezoneConfig, CronJobRunner, ScheduledJobRunner), per il BatchController e per i path preflight/clearCache di EnteApiService. Estesa anche la copertura di EventoRtMapper sulla copia degli header di risposta.
 
 	* [Pipeline]
 	Pipeline: skip dello zip SQL se src/main/resources/sql non esiste.
