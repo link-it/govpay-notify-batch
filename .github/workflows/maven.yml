@@ -247,9 +247,13 @@ jobs:
 
     - name: Zip SQL files
       run: |
-        cd src/main/resources
-        zip -r ../../../target/sql.zip sql
-        cd ../../../
+        if [ -d src/main/resources/sql ]; then
+          cd src/main/resources
+          zip -r ../../../target/sql.zip sql
+          cd ../../../
+        else
+          echo "src/main/resources/sql non presente, skip dello zip SQL."
+        fi
 
     - name: Assemble reports ZIP
       run: |
