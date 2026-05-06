@@ -224,5 +224,63 @@ class EventoRtMapperTest {
             assertNotNull(evento.getParametriRisposta());
             assertEquals(BigDecimal.valueOf(500), evento.getParametriRisposta().getStatus());
         }
+
+        @Test
+        @DisplayName("should copy non-empty headers from ResponseEntity")
+        void shouldCopyHeadersFromResponseEntity() {
+            NuovoEvento evento = mapper.createEvento(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, dataEnd);
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("X-Trace-Id", "trace-1");
+            headers.add("Content-Type", "application/json");
+            ResponseEntity<String> response = new ResponseEntity<>("body", headers, HttpStatus.OK);
+
+            mapper.setParametriRisposta(evento, dataEnd, response, null);
+
+            assertNotNull(evento.getParametriRisposta().getHeaders());
+            assertEquals(2, evento.getParametriRisposta().getHeaders().size());
+        }
+
+        @Test
+        @DisplayName("should copy non-empty headers from HttpStatusCodeException")
+        void shouldCopyHeadersFromException() {
+            NuovoEvento evento = mapper.createEvento(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, dataEnd);
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.add("X-Error-Code", "E42");
+            HttpClientErrorException exception = HttpClientErrorException.create(
+                    HttpStatus.BAD_REQUEST, "Bad Request", responseHeaders, "err".getBytes(), null);
+
+            mapper.setParametriRisposta(evento, dataEnd, null, exception);
+
+            assertNotNull(evento.getParametriRisposta().getHeaders());
+            assertEquals(1, evento.getParametriRisposta().getHeaders().size());
+            assertEquals(BigDecimal.valueOf(400), evento.getParametriRisposta().getStatus());
+        }
+    }
+
+    @Nested
+    @DisplayName("extractExceptionInfo (via createEventoKo)")
+    class ExtractExceptionInfoTest {
+
+        @Test
+        @DisplayName("KO esito with response details when only ResponseEntity is provided")
+        void koFromResponseEntityNo4xx() {
+            NuovoEvento evento = mapper.createEventoKo(rtInfo, TIPO_EVENTO, TRANSACTION_ID,
+                    dataStart, dataEnd,
+                    ResponseEntity.status(HttpStatus.BAD_REQUEST).build(), null);
+
+            assertEquals(EsitoEvento.KO, evento.getEsito());
+            assertEquals("400", evento.getSottotipoEsito());
+        }
+
+        @Test
+        @DisplayName("FAIL esito for 5xx ResponseEntity (no exception)")
+        void failFromResponseEntity5xx() {
+            NuovoEvento evento = mapper.createEventoKo(rtInfo, TIPO_EVENTO, TRANSACTION_ID,
+                    dataStart, dataEnd,
+                    ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(), null);
+
+            assertEquals(EsitoEvento.FAIL, evento.getEsito());
+            assertEquals("500", evento.getSottotipoEsito());
+        }
     }
 }
