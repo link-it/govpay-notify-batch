@@ -1,3 +1,15 @@
+2026-05-12  Giuliano Pintori <pintori@link.it>
+
+	* [Release]
+	Avanzata la versione del progetto a 1.0.2.
+
+	* [Configurazione]
+	Rimosse le direttive logging.level.* da application.properties.
+	I livelli di logging non devono essere fissati nella configurazione
+	di base: vanno demandati al runtime (variabili d'ambiente, profili
+	dedicati, configurazione esterna). Eliminato in particolare
+	logging.level.com.fasterxml.jackson=DEBUG, residuo di debug puntuale.
+
 2026-05-06  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
