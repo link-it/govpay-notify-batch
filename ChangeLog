@@ -10,6 +10,13 @@
 	dedicati, configurazione esterna). Eliminato in particolare
 	logging.level.com.fasterxml.jackson=DEBUG, residuo di debug puntuale.
 
+	* [Security]
+	Soppressione CVE GHSA-rwm7-x88c-3g2p (Netty epoll DoS, CVSS 7.5) come falso positivo.
+	Aggiunto src/main/resources/osv/falsePositives/osv-scanner.toml con motivazione e ignoreUntil = 2026-11-12: la vulnerabilita' richiede un socket server epoll con ALLOW_HALF_CLOSURE abilitato, mentre il batch usa Reactor Netty solo lato client (WebClient verso pagoPA). La patch upstream e' solo in Netty 4.2.13.Final, incompatibile con la linea Reactor Netty 1.2.x di Spring Boot 3.5.
+
+	* [Pipeline]
+	Aggiunto flag --config al job osv-scan in .github/workflows/maven.yml per puntare al nuovo file di soppressioni OSV-Scanner.
+
 2026-05-06  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
