@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 
-import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.infrastructure.item.ItemProcessor;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 

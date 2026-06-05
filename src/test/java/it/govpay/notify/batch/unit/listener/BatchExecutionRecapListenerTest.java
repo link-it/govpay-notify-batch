@@ -13,7 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.BatchStatus;
-import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.job.JobExecution;
 
 import it.govpay.notify.batch.listener.BatchExecutionRecapListener;
 
@@ -38,7 +38,7 @@ class BatchExecutionRecapListenerTest {
         @Test
         @DisplayName("should log without exceptions")
         void shouldLogWithoutExceptions() {
-            when(jobExecution.getJobId()).thenReturn(1L);
+            when(jobExecution.getJobInstanceId()).thenReturn(1L);
 
             assertDoesNotThrow(() -> listener.beforeJob(jobExecution));
         }

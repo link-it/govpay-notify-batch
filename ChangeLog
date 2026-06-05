@@ -1,3 +1,26 @@
+2026-06-05  Giuliano Pintori <pintori@link.it>
+
+	* [Release]
+	Avanzata la versione del progetto a 2.0.0-SNAPSHOT.
+
+	* [Dependencies]
+	Migrazione a Spring Boot 4.x / Spring Framework 7.x.
+	govpay-bom: 1.1.3 -> 2.0.0-SNAPSHOT.
+	govpay-common: 1.1.2 -> 2.0.0-SNAPSHOT.
+	govpay-ec-client: 1.0.0 -> 2.0.0-SNAPSHOT.
+	Aggiornamenti transitivi: Spring Boot 4.0.x, Spring Framework 7.0.x, Spring Batch 6.0.x, Hibernate ORM 7.2.x, Jackson 3.x (groupId tools.jackson).
+
+	* [Refactor]
+	Allineati i package Spring Batch 6: org.springframework.batch.core.Job/Step/JobExecution/listener spostati nei sottopackage .job/.step/.listener; item API spostate in org.springframework.batch.infrastructure.item.*; eccezioni di launch ricollocate in org.springframework.batch.core.launch.*; JobParametersInvalidException rinominato in InvalidJobParametersException; RunIdIncrementer in .job.parameters; @EntityScan in org.springframework.boot.persistence.autoconfigure.
+	BatchController: iniettato JobRepository in luogo di JobExplorer (rimosso in Spring Batch 6).
+	BatchExecutionRecapListener: usa getJobInstanceId() al posto del rimosso JobExecution.getJobId().
+	GdeService: passato a tools.jackson.databind.ObjectMapper (Jackson 3), coerente con AbstractGdeService di govpay-common 2.0.
+	EnteApiService: mappatura esplicita del codice esito numerico verso NuovaRendicontazione.EsitoEnum (in govpay-ec-client 2.0 fromValue accetta il nome stringa dell'enum, non piu' il codice).
+
+	* [Test]
+	Aggiunta dipendenza spring-boot-starter-data-jpa-test (in Spring Boot 4 @DataJpaTest non e' piu' nello starter di test generico).
+	Aggiornati gli import dei test di unita' ai nuovi package Spring Batch 6.
+
 2026-05-12  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
