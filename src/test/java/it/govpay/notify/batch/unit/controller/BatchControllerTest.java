@@ -11,8 +11,8 @@ import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.explore.JobExplorer;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +27,7 @@ import it.govpay.notify.batch.service.EnteApiService;
 class BatchControllerTest {
 
     private JobExecutionHelper jobExecutionHelper;
-    private JobExplorer jobExplorer;
+    private JobRepository jobRepository;
     private Job rtNotifyJob;
     private EnteApiService enteApiService;
     private Environment environment;
@@ -38,7 +38,7 @@ class BatchControllerTest {
     @BeforeEach
     void setUp() {
         jobExecutionHelper = mock(JobExecutionHelper.class);
-        jobExplorer = mock(JobExplorer.class);
+        jobRepository = mock(JobRepository.class);
         rtNotifyJob = mock(Job.class);
         enteApiService = mock(EnteApiService.class);
         environment = mock(Environment.class);
@@ -46,7 +46,7 @@ class BatchControllerTest {
 
         controller = new BatchController(
                 jobExecutionHelper,
-                jobExplorer,
+                jobRepository,
                 rtNotifyJob,
                 enteApiService,
                 environment,

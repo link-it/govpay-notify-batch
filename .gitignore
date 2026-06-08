@@ -28,3 +28,6 @@ docker/buildcontext/
 .settings/
 *.sublime-workspace
 
+# Note di release locali, non tracciate
+RELEASE_NOTES.md
+
