@@ -1,3 +1,10 @@
+2026-06-09  Giuliano Pintori <pintori@link.it>
+
+	* [Pipeline]
+	Allineata la gestione della cache OWASP/NVD a quella di govpay-common.
+	La chiave di cache include ora anche la versione del plugin OWASP (letta da pom.xml tramite mvn help:evaluate -Dexpression=owasp.plugin.version, definita nel govpay-bom): runner.os-owasp-v{version}-{date}, con restore-key runner.os-owasp-v{version}-. Un bump del plugin invalida quindi automaticamente la cache (lo schema del DB NVD cambia tra release). Aggiornati sia maven.yml sia refresh-owasp-db.yml.
+	refresh-owasp-db.yml: aggiunto checkout del repo (necessario per leggere il pom), CLI dependency-check scaricato dalla versione del plugin (non piu' hardcoded) e dal nuovo repo dependency-check/DependencyCheck (era jeremylong/DependencyCheck).
+
 2026-06-05  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
