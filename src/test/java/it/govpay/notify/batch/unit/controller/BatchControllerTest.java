@@ -29,6 +29,7 @@ class BatchControllerTest {
     private JobExecutionHelper jobExecutionHelper;
     private JobRepository jobRepository;
     private Job rtNotifyJob;
+    private Job rtSendJob;
     private EnteApiService enteApiService;
     private Environment environment;
     private ZoneId applicationZoneId;
@@ -40,6 +41,7 @@ class BatchControllerTest {
         jobExecutionHelper = mock(JobExecutionHelper.class);
         jobRepository = mock(JobRepository.class);
         rtNotifyJob = mock(Job.class);
+        rtSendJob = mock(Job.class);
         enteApiService = mock(EnteApiService.class);
         environment = mock(Environment.class);
         applicationZoneId = ZoneId.of("Europe/Rome");
@@ -48,6 +50,7 @@ class BatchControllerTest {
                 jobExecutionHelper,
                 jobRepository,
                 rtNotifyJob,
+                rtSendJob,
                 enteApiService,
                 environment,
                 applicationZoneId,
@@ -99,6 +102,19 @@ class BatchControllerTest {
     @DisplayName("eseguiJobEndpoint returns a non-null response (force=true)")
     void eseguiJobEndpointForceReturnsResponse() {
         assertNotNull(controller.eseguiJobEndpoint(true));
+    }
+
+    @Test
+    @DisplayName("eseguiJobEndpoint avvia anche rtSendJob in modalita' best-effort")
+    void eseguiJobEndpointAlsoTriggersRtSendJob() throws Exception {
+        controller.eseguiJobEndpoint(false);
+
+        // executeIfPossible(rtSendJob, "rtSendJob") gira async sul ForkJoinPool.commonPool().
+        // Aspettiamo che la chiamata venga registrata (max ~2s) per evitare flakiness.
+        org.awaitility.Awaitility.await()
+                .atMost(java.time.Duration.ofSeconds(2))
+                .untilAsserted(() ->
+                        verify(jobExecutionHelper).executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME));
     }
 
     @Test

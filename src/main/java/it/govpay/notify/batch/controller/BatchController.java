@@ -1,6 +1,7 @@
 package it.govpay.notify.batch.controller;
 
 import java.time.ZoneId;
+import java.util.concurrent.CompletableFuture;
 
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.repository.JobRepository;
@@ -31,18 +32,21 @@ import lombok.extern.slf4j.Slf4j;
 public class BatchController extends AbstractBatchController {
 
     private final Job rtNotifyJob;
+    private final Job rtSendJob;
     private final EnteApiService enteApiService;
 
     public BatchController(
             JobExecutionHelper jobExecutionHelper,
             JobRepository jobRepository,
             @Qualifier("rtNotifyJob") Job rtNotifyJob,
+            @Qualifier("rtSendJob") Job rtSendJob,
             EnteApiService enteApiService,
             Environment environment,
             ZoneId applicationZoneId,
             @Value("${scheduler.rtNotifyJob.fixedDelayString:7200000}") long schedulerIntervalMillis) {
         super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis);
         this.rtNotifyJob = rtNotifyJob;
+        this.rtSendJob = rtSendJob;
         this.enteApiService = enteApiService;
     }
 
@@ -62,10 +66,43 @@ public class BatchController extends AbstractBatchController {
         return ResponseEntity.ok("Cache connettori svuotata");
     }
 
+    /**
+     * Esegue manualmente i job batch del progetto.
+     * <p>
+     * Primo job: {@code rtNotifyJob} (notifica delle rendicontazioni), gestito dalla
+     * superclasse — risponde con {@code 202 Accepted} se libero, {@code 409 Conflict}
+     * se gia' in esecuzione (vedi {@link AbstractBatchController#eseguiJob}).
+     * <p>
+     * Secondo job: {@code rtSendJob} (spedizione delle ricevute di pagamento), lanciato
+     * "best effort" in modo asincrono dopo il primo: il pre-check di concorrenza e' fatto
+     * da {@link JobExecutionHelper#executeIfPossible} (se gia' in esecuzione viene skippato,
+     * si trova solo nel log). Il suo esito non altera la response HTTP, che resta quella
+     * del primo job.
+     */
     @GetMapping("/run")
     public ResponseEntity<Object> eseguiJobEndpoint(
             @RequestParam(name = "force", required = false, defaultValue = "false") boolean force) {
-        return eseguiJob(force);
+        ResponseEntity<Object> notifyResponse = eseguiJob(force);
+        lanciaRtSendJobAsincrono();
+        return notifyResponse;
+    }
+
+    /**
+     * Lancia {@code rtSendJob} in background tramite
+     * {@link JobExecutionHelper#executeIfPossible}, che fa internamente il check di
+     * concorrenza multi-nodo. Eventuali eccezioni sono solo loggate: la risposta HTTP
+     * dell'endpoint resta quella del job primario.
+     */
+    private void lanciaRtSendJobAsincrono() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                log.info("Lancio best-effort del job {}", Costanti.RT_SEND_JOB_NAME);
+                getJobExecutionHelper().executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME);
+            } catch (Exception e) {
+                log.warn("Impossibile avviare {} dal controller: {}",
+                        Costanti.RT_SEND_JOB_NAME, e.getMessage(), e);
+            }
+        });
     }
 
     @GetMapping("/status")
