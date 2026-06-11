@@ -1,5 +1,15 @@
 2026-06-09  Giuliano Pintori <pintori@link.it>
 
+	* [Feature]
+	Porting del servizio di spedizione delle notifiche delle ricevute di pagamento (RT) all'API di integrazione dell'Ente, allineato al monolite GovPay (NotificheBD + InviaNotificaThread + RicevuteConverter).
+	Nuovo job batch indipendente rtSendJob, separato da rtNotifyJob: reader paginato sulla tabella notifiche (tipo_esito=RICEVUTA, stato=DA_SPEDIRE, data_prossima_spedizione<now), processor che spedisce via govpay-ec-client 2.0.0-SNAPSHOT (NotificaRicevuteApi, v2 EC API: PUT /ricevute/{idDominio}/{iuv}/{idRicevuta}), writer in transazione per item con tre transizioni di stato: SUCCESS->updateSpedito, ERROR->updateDaSpedire con backoff quadratico (tentativi^2*60s capped a 24h), ABORT->updateAnnullata con sentinel "mai" (9999-02-01).
+	Nuovo runner @Scheduled (@Profile("default"), feature flag govpay.batch.rt-send.enabled=false di default).
+	Entity locali Notifica, Rpt + enum StatoSpedizione/TipoNotifica.
+	RicevutaV2Mapper popola il payload Ricevuta v2 con i campi disponibili in DB: dominio, iuv, idRicevuta, importo, esito, data/dataPagamento, istitutoAttestante, rt (xml grezzo + tipo CT_RICEVUTA_TELEMATICA/CT_RECEIPT in base alla colonna versione della RPT).
+	Solo la v2 dell'EC API e' supportata: connettori configurati su versioni diverse vengono trattati come ABORT (notifica annullata). Issue separata predisposta per esporre la versione del connettore su govpay-common in modo strong-typed (docs/issues/govpay-common-versione-connettore.md); workaround temporaneo: lettura via ConnettoreService.getConnettoreAsMap.
+	Timeout HTTP del client EC letti da properties (govpay.batch.rt-send.http.connect-timeout-ms / read-timeout-ms).
+	Schedulazione tramite cron Spring (default scheduler.rtSendJob.cron=0 * * * * *, ogni minuto al secondo 0) in linea col monolite GovPay (le notifiche venivano inserite nella coda alla ricezione della RT e spedite entro un minuto).
+
 	* [Pipeline]
 	Allineata la gestione della cache OWASP/NVD a quella di govpay-common.
 	La chiave di cache include ora anche la versione del plugin OWASP (letta da pom.xml tramite mvn help:evaluate -Dexpression=owasp.plugin.version, definita nel govpay-bom): runner.os-owasp-v{version}-{date}, con restore-key runner.os-owasp-v{version}-. Un bump del plugin invalida quindi automaticamente la cache (lo schema del DB NVD cambia tra release). Aggiornati sia maven.yml sia refresh-owasp-db.yml.
