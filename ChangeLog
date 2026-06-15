@@ -1,5 +1,10 @@
 2026-06-15  Giuliano Pintori <pintori@link.it>
 
+	* [Security]
+	Rimossi override e soppressioni divenuti ridondanti grazie all'aggiornamento del govpay-bom.
+	Eliminato l'import di netty-bom 4.1.133.Final (era forzato per CVE GHSA-v8h7-rr48-vmmv su netty-codec-http): il nuovo BOM risolve Netty a 4.2.15.Final, posteriore alla fix 4.2.13.Final. Rimosso l'intero blocco dependencyManagement, ora vuoto.
+	Eliminata la soppressione OSV-Scanner per CVE GHSA-rwm7-x88c-3g2p (Netty epoll DoS, marcata come falso positivo con rivalutazione al passaggio a Netty 4.2.x): la patch upstream e' presente in 4.2.13.Final, quindi 4.2.15.Final la include. Rimosso il file src/main/resources/osv/falsePositives/osv-scanner.toml e la directory contenente; aggiornato .github/workflows/maven.yml togliendo --config dal job osv-scan.
+
 	* [Feature]
 	La proprieta' govpay.batch.rt-send.enabled (default false) diventa kill switch effettivo sulla spedizione RT, non solo sullo scheduler. Quando disabilitata: il runner schedulato non viene istanziato (@ConditionalOnProperty come prima) e il BatchController salta anche il lancio best-effort di rtSendJob dall'endpoint /api/batch/run. Quando abilitata: il job parte sia da cron sia da API. Aggiornato il commento descrittivo in application.properties.
 
