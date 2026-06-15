@@ -33,6 +33,7 @@ public class BatchController extends AbstractBatchController {
 
     private final Job rtNotifyJob;
     private final Job rtSendJob;
+    private final boolean rtSendEnabled;
     private final EnteApiService enteApiService;
 
     public BatchController(
@@ -43,10 +44,12 @@ public class BatchController extends AbstractBatchController {
             EnteApiService enteApiService,
             Environment environment,
             ZoneId applicationZoneId,
-            @Value("${scheduler.rtNotifyJob.fixedDelayString:7200000}") long schedulerIntervalMillis) {
+            @Value("${scheduler.rtNotifyJob.fixedDelayString:7200000}") long schedulerIntervalMillis,
+            @Value("${govpay.batch.rt-send.enabled:false}") boolean rtSendEnabled) {
         super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis);
         this.rtNotifyJob = rtNotifyJob;
         this.rtSendJob = rtSendJob;
+        this.rtSendEnabled = rtSendEnabled;
         this.enteApiService = enteApiService;
     }
 
@@ -92,8 +95,17 @@ public class BatchController extends AbstractBatchController {
      * {@link JobExecutionHelper#executeIfPossible}, che fa internamente il check di
      * concorrenza multi-nodo. Eventuali eccezioni sono solo loggate: la risposta HTTP
      * dell'endpoint resta quella del job primario.
+     * <p>
+     * Rispetta la feature flag {@code govpay.batch.rt-send.enabled}: se {@code false},
+     * il job non viene lanciato (kill switch coerente con il runner schedulato, che
+     * tramite {@code @ConditionalOnProperty} non viene nemmeno istanziato).
      */
     private void lanciaRtSendJobAsincrono() {
+        if (!rtSendEnabled) {
+            log.debug("Spedizione RT disabilitata (govpay.batch.rt-send.enabled=false): {} non avviato",
+                    Costanti.RT_SEND_JOB_NAME);
+            return;
+        }
         CompletableFuture.runAsync(() -> {
             try {
                 log.info("Lancio best-effort del job {}", Costanti.RT_SEND_JOB_NAME);
