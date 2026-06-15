@@ -46,7 +46,11 @@ class BatchControllerTest {
         environment = mock(Environment.class);
         applicationZoneId = ZoneId.of("Europe/Rome");
 
-        controller = new BatchController(
+        controller = buildController(true);
+    }
+
+    private BatchController buildController(boolean rtSendEnabled) {
+        return new BatchController(
                 jobExecutionHelper,
                 jobRepository,
                 rtNotifyJob,
@@ -54,7 +58,8 @@ class BatchControllerTest {
                 enteApiService,
                 environment,
                 applicationZoneId,
-                3_600_000L);
+                3_600_000L,
+                rtSendEnabled);
     }
 
     @Test
@@ -105,7 +110,7 @@ class BatchControllerTest {
     }
 
     @Test
-    @DisplayName("eseguiJobEndpoint avvia anche rtSendJob in modalita' best-effort")
+    @DisplayName("eseguiJobEndpoint avvia anche rtSendJob in modalita' best-effort (flag abilitato)")
     void eseguiJobEndpointAlsoTriggersRtSendJob() throws Exception {
         controller.eseguiJobEndpoint(false);
 
@@ -115,6 +120,19 @@ class BatchControllerTest {
                 .atMost(java.time.Duration.ofSeconds(2))
                 .untilAsserted(() ->
                         verify(jobExecutionHelper).executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME));
+    }
+
+    @Test
+    @DisplayName("eseguiJobEndpoint NON avvia rtSendJob se govpay.batch.rt-send.enabled=false")
+    void eseguiJobEndpointSkipsRtSendJobWhenDisabled() throws Exception {
+        BatchController disabledController = buildController(false);
+
+        disabledController.eseguiJobEndpoint(false);
+
+        // Diamo tempo a un eventuale runAsync di partire (max ~1s) per essere sicuri che NON parta.
+        Thread.sleep(500);
+        org.mockito.Mockito.verify(jobExecutionHelper, org.mockito.Mockito.never())
+                .executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME);
     }
 
     @Test

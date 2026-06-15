@@ -1,3 +1,8 @@
+2026-06-15  Giuliano Pintori <pintori@link.it>
+
+	* [Feature]
+	La proprieta' govpay.batch.rt-send.enabled (default false) diventa kill switch effettivo sulla spedizione RT, non solo sullo scheduler. Quando disabilitata: il runner schedulato non viene istanziato (@ConditionalOnProperty come prima) e il BatchController salta anche il lancio best-effort di rtSendJob dall'endpoint /api/batch/run. Quando abilitata: il job parte sia da cron sia da API. Aggiornato il commento descrittivo in application.properties.
+
 2026-06-09  Giuliano Pintori <pintori@link.it>
 
 	* [Feature]
