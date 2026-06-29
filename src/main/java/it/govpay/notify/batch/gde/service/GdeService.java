@@ -6,7 +6,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -41,9 +40,6 @@ import lombok.extern.slf4j.Slf4j;
 public class GdeService extends AbstractGdeService {
     private final EventoRtMapper eventoRtMapper;
     private final ConfigurazioneService configurazioneService;
-
-    @Value("${govpay.url}")
-    private String govpayUrl;
 
     public GdeService(ObjectMapper objectMapper,
                       @Qualifier("asyncHttpExecutor") Executor asyncHttpExecutor,
