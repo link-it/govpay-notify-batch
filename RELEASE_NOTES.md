@@ -2,8 +2,8 @@
 
 ## v1.0.3 — 2026-06-30
 
-Release di manutenzione: due fix per lo startup del container. Nessun
-cambio funzionale, dipendenze invariate rispetto a `1.0.2`.
+Release di manutenzione: due fix per lo startup del container + bump
+delle dipendenze transitive per chiudere le CVE segnalate da OSV.
 
 ### Fix
 
@@ -26,6 +26,38 @@ cambio funzionale, dipendenze invariate rispetto a `1.0.2`.
   anche quando il volume `jdbc-drivers` era montato correttamente.
   Aggiunto anche log di conferma del path attivo.
 
+### Sicurezza
+
+Bump di tre famiglie di dipendenze transitive in risposta alle CVE
+segnalate da OSV scan (25 CVE coperte in totale, una soppressa in attesa
+di publish upstream):
+
+- **`com.fasterxml.jackson.core:jackson-databind`** `2.21.1` → `2.21.4`
+  (importato `jackson-bom` in `dependencyManagement`: la property
+  `jackson-bom.version` viene sovrascritta da `govpay-bom 1.1.3`).
+  Risolte: GHSA-5hh8-q8hv-fr38, GHSA-9fxm-vc8v-hj55, GHSA-hgj6-7826-r7m5,
+  GHSA-j3rv-43j4-c7qm, GHSA-rcqc-6cw3-h962, GHSA-rmj7-2vxq-3g9f.
+- **`io.netty:*`** `4.1.133.Final` → `4.1.135.Final` (override
+  `netty-bom`, sostituisce il precedente override per
+  `GHSA-v8h7-rr48-vmmv`). Risolte: GHSA-hvcg-qmg6-jm4c,
+  GHSA-563q-j3cm-6jxm, GHSA-5x3r-wrvg-rp6q, GHSA-c2gf-v879-257j,
+  GHSA-3qp7-7mw8-wx86, GHSA-c653-97m9-rcg9, GHSA-x4gw-5cx5-pgmh,
+  GHSA-5pvg-856g-cp85, GHSA-676x-f7gg-47vc, GHSA-xmv7-r254-6q78,
+  GHSA-w573-9ffj-6ff9.
+- **`org.apache.tomcat.embed:tomcat-embed-core`** `10.1.54` → `10.1.55`
+  (property `tomcat.version`). Risolte: GHSA-5m62-pw8w-7w9f,
+  GHSA-5mp6-jrq3-r938, GHSA-9m89-8frq-c98c, GHSA-fv25-8xcx-gqjc,
+  GHSA-gx5v-xp9w-j4cg, GHSA-h6fc-48rj-7qqh, GHSA-r29c-68gh-xp6x.
+
+Soppressione temporanea:
+
+- **GHSA-5jmj-h7xm-6q6v** (CVSS 5.3): il fix indicato da OSV è in
+  `jackson-databind 2.21.5`, non ancora pubblicata su Maven Central
+  (l'ultima patch della linea `2.21.x` è `2.21.4`). Soppressa in
+  `src/main/resources/osv/falsePositives/osv-scanner.toml` con
+  `ignoreUntil = 2026-10-15`. Da rivalutare quando `2.21.5` sarà
+  disponibile (oppure considerando il salto alla linea `2.22.x`).
+
 ### Limitazioni note (invariate da 1.0.1)
 
 - `NuovaRendicontazione.EsitoEnum` di `govpay-ec-client:1.0.0` ha tutti
@@ -37,14 +69,14 @@ cambio funzionale, dipendenze invariate rispetto a `1.0.2`.
 
 ### Dipendenze principali
 
-Nessun aggiornamento rispetto a 1.0.2.
-
 | Artifact | Versione |
 | --- | --- |
 | `org.gov4j.govpay:govpay-bom` (parent) | `1.1.3` |
 | `org.gov4j.govpay:govpay-common` | `1.1.2` |
 | `org.gov4j.govpay:govpay-ec-client` | `1.0.0` |
-| `io.netty:netty-bom` (override) | `4.1.133.Final` |
+| `com.fasterxml.jackson:jackson-bom` (override) | `2.21.4` |
+| `io.netty:netty-bom` (override) | `4.1.135.Final` |
+| `org.apache.tomcat.embed:tomcat-embed-core` (override) | `10.1.55` |
 
 ### Asset di release
 

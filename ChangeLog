@@ -3,6 +3,13 @@
 	* [Release]
 	Avanzata la versione del progetto a 1.0.3.
 
+	* [Security]
+	Risolte le CVE segnalate da OSV scan tramite bump delle dipendenze transitive:
+	- jackson-databind 2.21.1 -> 2.21.4 (jackson-bom importato in dependencyManagement perche' la property jackson-bom.version viene sovrascritta da govpay-bom 1.1.3): copre GHSA-5hh8-q8hv-fr38, GHSA-9fxm-vc8v-hj55, GHSA-hgj6-7826-r7m5, GHSA-j3rv-43j4-c7qm, GHSA-rcqc-6cw3-h962, GHSA-rmj7-2vxq-3g9f.
+	- io.netty:* 4.1.133.Final -> 4.1.135.Final (override netty-bom in dependencyManagement): copre GHSA-hvcg-qmg6-jm4c, GHSA-563q-j3cm-6jxm, GHSA-5x3r-wrvg-rp6q, GHSA-c2gf-v879-257j, GHSA-3qp7-7mw8-wx86, GHSA-c653-97m9-rcg9, GHSA-x4gw-5cx5-pgmh, GHSA-5pvg-856g-cp85, GHSA-676x-f7gg-47vc, GHSA-xmv7-r254-6q78, GHSA-w573-9ffj-6ff9 (sostituisce anche il precedente override per GHSA-v8h7-rr48-vmmv).
+	- tomcat-embed-core 10.1.54 -> 10.1.55 (property tomcat.version): copre GHSA-5m62-pw8w-7w9f, GHSA-5mp6-jrq3-r938, GHSA-9m89-8frq-c98c, GHSA-fv25-8xcx-gqjc, GHSA-gx5v-xp9w-j4cg, GHSA-h6fc-48rj-7qqh, GHSA-r29c-68gh-xp6x.
+	Resta aperta la sola GHSA-5jmj-h7xm-6q6v (CVSS 5.3, fix in jackson-databind 2.21.5 non ancora pubblicata): soppressa in src/main/resources/osv/falsePositives/osv-scanner.toml con ignoreUntil = 2026-10-15.
+
 	* [Fix]
 	Aggiunta classe BatchInfraConfig che dichiara esplicitamente come @Bean JobExecutionHelper e JobConcurrencyService di govpay-common. La libreria comune espone questi tipi solo via factory statiche in BatchCommonAutoConfiguration, non come bean auto-registrati. Senza la config esplicita lo startup falliva con "No qualifying bean of type 'it.govpay.common.batch.runner.JobExecutionHelper' available" perche' AbstractScheduledJobRunner / AbstractCronJobRunner (e i nostri ScheduledJobRunner / CronJobRunner) richiedono il bean. Allineato a BatchInfraConfig di govpay-rt-batch (Spring Batch 5: JobLauncher + JobExplorer).
 

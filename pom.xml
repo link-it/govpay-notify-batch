@@ -27,6 +27,16 @@
 
         <!-- SonarCloud -->
         <sonar.coverage.exclusions>**/test/**,**/*Test*.java</sonar.coverage.exclusions>
+
+        <!-- Override property di Spring Boot per CVE risolte (OSV scan):
+             - jackson-databind 2.21.1 -> 2.21.4 (GHSA-5hh8-q8hv-fr38, 9fxm-vc8v-hj55,
+               hgj6-7826-r7m5, j3rv-43j4-c7qm, rcqc-6cw3-h962, rmj7-2vxq-3g9f).
+               GHSA-5jmj-h7xm-6q6v richiede 2.21.5 (non ancora pubblicata su Maven Central):
+               soppressa in osv-scanner.toml con ignoreUntil.
+             - tomcat-embed-core 10.1.54 -> 10.1.55 (GHSA-5m62-pw8w-7w9f, 5mp6-jrq3-r938,
+               9m89-8frq-c98c, fv25-8xcx-gqjc, gx5v-xp9w-j4cg, h6fc-48rj-7qqh, r29c-68gh-xp6x) -->
+        <jackson-bom.version>2.21.4</jackson-bom.version>
+        <tomcat.version>10.1.55</tomcat.version>
     </properties>
 
     <repositories>
@@ -96,11 +106,30 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- Override Netty BOM per fix CVE GHSA-v8h7-rr48-vmmv (netty-codec-http < 4.1.133.Final) -->
+            <!-- Override Jackson BOM per CVE risolte (OSV scan, fixed in 2.21.4 / 2.21.5):
+                 6 CVE coperte da 2.21.4 (GHSA-5hh8-q8hv-fr38, 9fxm-vc8v-hj55, hgj6-7826-r7m5,
+                 j3rv-43j4-c7qm, rcqc-6cw3-h962, rmj7-2vxq-3g9f); GHSA-5jmj-h7xm-6q6v richiede
+                 2.21.5 non ancora pubblicata -> soppressa in osv-scanner.toml. La property
+                 jackson-bom.version non basta perche' viene sovrascritta da govpay-bom 1.1.3. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Override Netty BOM per CVE risolte (OSV scan, fixed in 4.1.135.Final):
+                 GHSA-hvcg-qmg6-jm4c (netty-codec-http),
+                 GHSA-563q-j3cm-6jxm, GHSA-5x3r-wrvg-rp6q, GHSA-c2gf-v879-257j (netty-codec-http2),
+                 GHSA-3qp7-7mw8-wx86, GHSA-c653-97m9-rcg9, GHSA-x4gw-5cx5-pgmh (netty-handler),
+                 GHSA-5pvg-856g-cp85, GHSA-676x-f7gg-47vc, GHSA-xmv7-r254-6q78 (netty-resolver-dns),
+                 GHSA-w573-9ffj-6ff9 (netty-transport-native-epoll).
+                 Sostituisce il precedente override 4.1.133.Final (GHSA-v8h7-rr48-vmmv). -->
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.1.133.Final</version>
+                <version>4.1.135.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

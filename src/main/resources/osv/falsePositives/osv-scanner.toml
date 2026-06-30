@@ -1,15 +1,14 @@
-# Configurazione OSV-Scanner: soppressione vulnerabilità non sfruttabili.
+# Configurazione OSV-Scanner: soppressione vulnerabilità con fix upstream non ancora disponibile.
 # Riferimento: https://google.github.io/osv-scanner/configuration/
 
 [[IgnoredVulns]]
-id = "GHSA-rwm7-x88c-3g2p"
-ignoreUntil = 2026-11-12
+id = "GHSA-5jmj-h7xm-6q6v"
+ignoreUntil = 2026-10-15
 reason = """
-Netty epoll DoS (ALLOW_HALF_CLOSURE su FIN+RST) non sfruttabile in questo
-contesto: il batch utilizza Reactor Netty esclusivamente come client HTTP
-(WebClient verso pagoPA) e non espone alcun socket server basato sul
-trasporto epoll né abilita ALLOW_HALF_CLOSURE. L'unica patch upstream è in
-Netty 4.2.13.Final, incompatibile con la linea Reactor Netty 1.2.x adottata
-da Spring Boot 3.5. Rivalutare quando il progetto passerà a Reactor Netty
-1.3.x / Netty 4.2.x.
+CVE su com.fasterxml.jackson.core:jackson-databind 2.21.1 (CVSS 5.3): la fix
+indicata da OSV e' in 2.21.5, non ancora pubblicata su Maven Central
+(<latest> = 2.22.0, ultima patch della linea 2.21.x = 2.21.4). Le altre 6 CVE
+Jackson della batch OSV sono gia' coperte dal bump a 2.21.4 nel pom.xml. Da
+rivalutare appena 2.21.5 sara' disponibile (oppure considerando il salto alla
+linea 2.22.x).
 """
