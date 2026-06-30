@@ -1,5 +1,61 @@
 # Release Notes
 
+## v1.0.3 — 2026-06-30
+
+Release di manutenzione: tre fix per lo startup del container e per la
+ricompilabilita' del progetto dal sorgente. Nessun cambio funzionale.
+
+### Fix
+
+- **Bean wiring di `govpay-common` mancante**: aggiunta classe
+  `it.govpay.notify.batch.config.BatchInfraConfig` che dichiara come
+  `@Bean` `JobExecutionHelper` e `JobConcurrencyService`. La libreria
+  comune (`1.1.2`) espone questi tipi solo via factory statiche in
+  `BatchCommonAutoConfiguration`, non come bean auto-registrati. Senza
+  la config esplicita lo startup falliva con
+  `No qualifying bean of type 'it.govpay.common.batch.runner.JobExecutionHelper' available`
+  perché `AbstractScheduledJobRunner` e `AbstractCronJobRunner` richiedono
+  il bean. Allineato a `BatchInfraConfig` di `govpay-rt-batch`.
+
+- **`LOADER_PATH` non propagato all'entrypoint Docker**: aggiunto
+  `export LOADER_PATH="${GOVPAY_DS_JDBC_LIBS}"` in
+  `docker/commons/entrypoint.sh` prima dell'`exec` del jar. Senza,
+  `PropertiesLauncher` non includeva la directory dei driver JDBC nel
+  classpath e l'avvio falliva con
+  `Cannot load driver class: org.postgresql.Driver`
+  anche quando il volume `jdbc-drivers` era montato correttamente.
+  Aggiunto anche log di conferma del path attivo.
+
+- **`EnteApiService.notifyRendicontazione` non compilava dal sorgente**:
+  la chiamata `NuovaRendicontazione.EsitoEnum.fromValue(BigDecimal)` era
+  rotta perché la signature dell'enum di `govpay-ec-client:1.0.0` è
+  `fromValue(String)`. Introdotto helper privato `mapEsito(int)` che
+  mappa esplicitamente i codici esito pagoPA (0 → `ESEGUITO`,
+  3 → `REVOCATO`, 4 → `ESEGUITO_STANDIN`,
+  8 → `ESEGUITO_STANDIN_SENZA_RPT`, 9 → `ESEGUITO_SENZA_RPT`) all'enum
+  strong-typed. Bug pre-esistente nella `1.0.2` (citato nelle
+  RELEASE_NOTES `1.0.1`).
+
+### Dipendenze principali
+
+Nessun aggiornamento rispetto a 1.0.2.
+
+| Artifact | Versione |
+| --- | --- |
+| `org.gov4j.govpay:govpay-bom` (parent) | `1.1.3` |
+| `org.gov4j.govpay:govpay-common` | `1.1.2` |
+| `org.gov4j.govpay:govpay-ec-client` | `1.0.0` |
+| `io.netty:netty-bom` (override) | `4.1.133.Final` |
+
+### Asset di release
+
+| File | Descrizione |
+| --- | --- |
+| `govpay-notify-batch-1.0.3.jar` | Fat JAR eseguibile (driver JDBC esclusi) |
+| `release-reports-1.0.3.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
+
+---
+
 ## v1.0.2 — 2026-05-12
 
 Release di manutenzione: cleanup della configurazione di logging di base e

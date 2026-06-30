@@ -1,5 +1,8 @@
 2026-06-30  Giuliano Pintori <pintori@link.it>
 
+	* [Release]
+	Avanzata la versione del progetto a 1.0.3.
+
 	* [Fix]
 	Aggiunta classe BatchInfraConfig che dichiara esplicitamente come @Bean JobExecutionHelper e JobConcurrencyService di govpay-common. La libreria comune espone questi tipi solo via factory statiche in BatchCommonAutoConfiguration, non come bean auto-registrati. Senza la config esplicita lo startup falliva con "No qualifying bean of type 'it.govpay.common.batch.runner.JobExecutionHelper' available" perche' AbstractScheduledJobRunner / AbstractCronJobRunner (e i nostri ScheduledJobRunner / CronJobRunner) richiedono il bean. Allineato a BatchInfraConfig di govpay-rt-batch (Spring Batch 5: JobLauncher + JobExplorer).
 
