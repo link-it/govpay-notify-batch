@@ -1,3 +1,14 @@
+2026-06-30  Giuliano Pintori <pintori@link.it>
+
+	* [Fix]
+	Aggiunta classe BatchInfraConfig che dichiara esplicitamente come @Bean JobExecutionHelper e JobConcurrencyService di govpay-common. La libreria comune espone questi tipi solo via factory statiche in BatchCommonAutoConfiguration, non come bean auto-registrati. Senza la config esplicita lo startup falliva con "No qualifying bean of type 'it.govpay.common.batch.runner.JobExecutionHelper' available" perche' AbstractScheduledJobRunner / AbstractCronJobRunner (e i nostri ScheduledJobRunner / CronJobRunner) richiedono il bean. Allineato a BatchInfraConfig di govpay-rt-batch (Spring Batch 5: JobLauncher + JobExplorer).
+
+	* [Fix]
+	EnteApiService: backport del workaround per EsitoEnum di govpay-ec-client. La chiamata EsitoEnum.fromValue(BigDecimal) non compila perche' la signature dell'enum e' fromValue(String). Introdotto helper privato mapEsito(int) che mappa esplicitamente i codici esito pagoPA (0->ESEGUITO, 3->REVOCATO, 4->ESEGUITO_STANDIN, 8->ESEGUITO_STANDIN_SENZA_RPT, 9->ESEGUITO_SENZA_RPT) all'enum strong-typed. Bug di compilazione pre-esistente nel tag 1.0.2 (citato anche in RELEASE_NOTES 1.0.1), che impediva di ricostruire l'immagine.
+
+	* [Fix]
+	docker/commons/entrypoint.sh: aggiunto export LOADER_PATH="${GOVPAY_DS_JDBC_LIBS}" prima dell'exec del jar (allineato a govpay-rt-batch). Senza, il PropertiesLauncher di Spring Boot non includeva la directory dei driver JDBC nel classpath e l'avvio falliva con "Cannot load driver class: org.postgresql.Driver" anche con il volume jdbc-drivers correttamente montato. Aggiunto anche log di conferma del path attivo.
+
 2026-05-12  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
