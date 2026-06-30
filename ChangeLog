@@ -1,3 +1,11 @@
+2026-06-30  Giuliano Pintori <pintori@link.it>
+
+	* [Fix]
+	Aggiunta classe BatchInfraConfig che dichiara esplicitamente come @Bean JobExecutionHelper e JobConcurrencyService di govpay-common. La libreria comune espone questi tipi solo via factory statiche in BatchCommonAutoConfiguration, non come bean auto-registrati. Senza la config esplicita lo startup falliva con "No qualifying bean of type 'it.govpay.common.batch.runner.JobExecutionHelper' available" perche' AbstractScheduledJobRunner / AbstractCronJobRunner (e i nostri ScheduledJobRunner / CronJobRunner / RtSendScheduledJobRunner) richiedono il bean. Allineato a BatchInfraConfig di govpay-rt-batch. Adattato a Spring Batch 6 (JobOperator + JobRepository al posto dei vecchi JobLauncher + JobExplorer).
+
+	* [Fix]
+	docker/commons/entrypoint.sh: aggiunto export LOADER_PATH="${GOVPAY_DS_JDBC_LIBS}" prima dell'exec del jar (allineato a govpay-rt-batch). Senza, il PropertiesLauncher di Spring Boot non includeva la directory dei driver JDBC nel classpath e l'avvio falliva con "Cannot load driver class: org.postgresql.Driver" anche quando il volume jdbc-drivers era montato correttamente. Il valore di GOVPAY_DS_JDBC_LIBS (default /opt/jdbc-drivers) viene ora propagato come LOADER_PATH, letto nativamente da PropertiesLauncher. Aggiunto anche log di conferma del path attivo.
+
 2026-06-15  Giuliano Pintori <pintori@link.it>
 
 	* [Security]
