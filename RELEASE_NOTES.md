@@ -2,8 +2,8 @@
 
 ## v1.0.3 — 2026-06-30
 
-Release di manutenzione: tre fix per lo startup del container e per la
-ricompilabilita' del progetto dal sorgente. Nessun cambio funzionale.
+Release di manutenzione: due fix per lo startup del container. Nessun
+cambio funzionale, dipendenze invariate rispetto a `1.0.2`.
 
 ### Fix
 
@@ -26,15 +26,14 @@ ricompilabilita' del progetto dal sorgente. Nessun cambio funzionale.
   anche quando il volume `jdbc-drivers` era montato correttamente.
   Aggiunto anche log di conferma del path attivo.
 
-- **`EnteApiService.notifyRendicontazione` non compilava dal sorgente**:
-  la chiamata `NuovaRendicontazione.EsitoEnum.fromValue(BigDecimal)` era
-  rotta perché la signature dell'enum di `govpay-ec-client:1.0.0` è
-  `fromValue(String)`. Introdotto helper privato `mapEsito(int)` che
-  mappa esplicitamente i codici esito pagoPA (0 → `ESEGUITO`,
-  3 → `REVOCATO`, 4 → `ESEGUITO_STANDIN`,
-  8 → `ESEGUITO_STANDIN_SENZA_RPT`, 9 → `ESEGUITO_SENZA_RPT`) all'enum
-  strong-typed. Bug pre-esistente nella `1.0.2` (citato nelle
-  RELEASE_NOTES `1.0.1`).
+### Limitazioni note (invariate da 1.0.1)
+
+- `NuovaRendicontazione.EsitoEnum` di `govpay-ec-client:1.0.0` ha tutti
+  i valori dichiarati come `new BigDecimal("null")` (bug del codegen) e
+  fallisce in `<clinit>` con `NumberFormatException` al primo accesso.
+  Di conseguenza il path HTTP di `EnteApiService.notifyRendicontazione`
+  non e' eseguibile a runtime ne' coperto dai test. Verra' affrontato con
+  il rilascio di una versione corretta di `govpay-ec-client`.
 
 ### Dipendenze principali
 
