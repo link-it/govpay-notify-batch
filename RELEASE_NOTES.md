@@ -1,8 +1,48 @@
 # Release Notes
 
-## v1.0.3 — 2026-07-01
+## v1.0.4 — 2026-07-01
 
-Release di manutenzione: tre fix per lo startup del container + bump
+Release di manutenzione: rimossa una `@Value` senza default che faceva
+fail-fast dell'avvio quando la relativa property non era impostata in
+ambiente. Nessun cambio funzionale, dipendenze invariate rispetto a
+`1.0.3`.
+
+### Fix
+
+- **Placeholder `govpay.url` non risolvibile**: il campo `govpayUrl` di
+  `GdeService` era iniettato via `@Value("${govpay.url}")` senza
+  default, ma non veniva mai letto da nessun metodo. Dead code che
+  faceva pero' fallire l'avvio con
+  `Could not resolve placeholder 'govpay.url'` non appena la property
+  non era impostata (come emerso nel deploy dell'immagine `1.0.3` in
+  ambiente locale). Rimosso il campo e il relativo import da
+  `GdeService`. Backport dal commit `d93d2bf` di `main`.
+
+### Dipendenze principali
+
+Invariate rispetto a `1.0.3`.
+
+| Artifact | Versione |
+| --- | --- |
+| `org.gov4j.govpay:govpay-bom` (parent) | `1.1.3` |
+| `org.gov4j.govpay:govpay-common` | `1.1.2` |
+| `org.gov4j.govpay:govpay-ec-client` | `1.0.0` |
+| `com.fasterxml.jackson:jackson-bom` (override) | `2.21.4` |
+| `io.netty:netty-bom` (override) | `4.1.135.Final` |
+| `org.apache.tomcat.embed:tomcat-embed-core` (override) | `10.1.55` |
+
+### Asset di release
+
+| File | Descrizione |
+| --- | --- |
+| `govpay-notify-batch-1.0.4.jar` | Fat JAR eseguibile (driver JDBC esclusi) |
+| `release-reports-1.0.4.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
+
+---
+
+## v1.0.3 — 2026-06-30
+
+Release di manutenzione: due fix per lo startup del container + bump
 delle dipendenze transitive per chiudere le CVE segnalate da OSV.
 
 ### Fix
@@ -25,13 +65,6 @@ delle dipendenze transitive per chiudere le CVE segnalate da OSV.
   `Cannot load driver class: org.postgresql.Driver`
   anche quando il volume `jdbc-drivers` era montato correttamente.
   Aggiunto anche log di conferma del path attivo.
-
-- **Placeholder `govpay.url` non risolvibile**: il campo `govpayUrl` di
-  `GdeService` era iniettato via `@Value("${govpay.url}")` senza
-  default, ma non veniva mai letto da nessun metodo. Dead code che
-  faceva pero' fallire l'avvio con
-  `Could not resolve placeholder 'govpay.url'` se la proprieta' non era
-  impostata. Rimosso il campo e il relativo import (backport da main).
 
 ### Sicurezza
 

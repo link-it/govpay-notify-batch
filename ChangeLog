@@ -1,3 +1,11 @@
+2026-07-01  Giuliano Pintori <pintori@link.it>
+
+	* [Release]
+	Avanzata la versione del progetto a 1.0.4.
+
+	* [Fix]
+	Rimossa proprieta' govpay.url, non utilizzata. Il campo govpayUrl in GdeService era iniettato via @Value("${govpay.url}") senza default ma non veniva mai letto da nessun metodo. Risultato: dead code che pero' faceva fallire l'avvio dell'applicazione con "Could not resolve placeholder 'govpay.url'" se la proprieta' non era impostata (come emerso nel deploy dell'immagine 1.0.3 in ambiente locale). Rimosso il campo e il relativo import. Backport da main (commit d93d2bf).
+
 2026-06-30  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
@@ -12,9 +20,6 @@
 
 	* [Fix]
 	Aggiunta classe BatchInfraConfig che dichiara esplicitamente come @Bean JobExecutionHelper e JobConcurrencyService di govpay-common. La libreria comune espone questi tipi solo via factory statiche in BatchCommonAutoConfiguration, non come bean auto-registrati. Senza la config esplicita lo startup falliva con "No qualifying bean of type 'it.govpay.common.batch.runner.JobExecutionHelper' available" perche' AbstractScheduledJobRunner / AbstractCronJobRunner (e i nostri ScheduledJobRunner / CronJobRunner) richiedono il bean. Allineato a BatchInfraConfig di govpay-rt-batch (Spring Batch 5: JobLauncher + JobExplorer).
-
-	* [Fix]
-	Rimossa proprieta' govpay.url, non utilizzata. Il campo govpayUrl in GdeService era iniettato via @Value("${govpay.url}") senza default ma non veniva mai letto da nessun metodo. Risultato: dead code che pero' faceva fallire l'avvio dell'applicazione (placeholder non risolvibile) se la proprieta' non era impostata. Rimosso il campo e il relativo import. Backport da main.
 
 	* [Fix]
 	docker/commons/entrypoint.sh: aggiunto export LOADER_PATH="${GOVPAY_DS_JDBC_LIBS}" prima dell'exec del jar (allineato a govpay-rt-batch). Senza, il PropertiesLauncher di Spring Boot non includeva la directory dei driver JDBC nel classpath e l'avvio falliva con "Cannot load driver class: org.postgresql.Driver" anche con il volume jdbc-drivers correttamente montato. Aggiunto anche log di conferma del path attivo.

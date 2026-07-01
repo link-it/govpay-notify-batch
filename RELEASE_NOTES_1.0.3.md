@@ -1,10 +1,10 @@
 # GovPay NOTIFY Batch — Release Notes v1.0.3
 
-Data: 2026-07-01
-Branch: `1.x.x`
+Data: 2026-06-30
+Branch: `1.x.x` (HEAD: `98465e1`)
 Linea: 1.x (Spring Boot 3.5 + `govpay-common` 1.1.2)
 
-Release di manutenzione: tre fix per lo startup del container + bump
+Release di manutenzione: due fix per lo startup del container + bump
 delle dipendenze transitive per chiudere le CVE segnalate da OSV scan.
 
 ## Fix
@@ -42,19 +42,6 @@ Cannot load driver class: org.postgresql.Driver
 
 anche quando il volume `jdbc-drivers` era montato correttamente.
 Aggiunto anche log di conferma del path attivo.
-
-### Placeholder `govpay.url` non risolvibile
-
-Il campo `govpayUrl` di `GdeService` era iniettato via
-`@Value("${govpay.url}")` senza default, ma non veniva mai letto da
-nessun metodo. Dead code che faceva pero' fallire l'avvio con:
-
-```
-Could not resolve placeholder 'govpay.url' in value "${govpay.url}"
-```
-
-se la proprieta' non era impostata. Rimosso il campo e il relativo
-import da `GdeService`. Backport dal commit `d93d2bf` di `main`.
 
 ## Sicurezza
 
