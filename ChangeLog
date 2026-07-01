@@ -1,7 +1,8 @@
 2026-07-01  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
-	Avanzata la versione del progetto a 1.0.4.
+	Avanzata la versione del progetto a 1.0.5.
+	La 1.0.4 e' stata saltata: il tag 1.0.4 era stato erroneamente posizionato su un commit del branch main (9aeba17) privo della classe BatchInfraConfig, quindi il jar/immagine risultanti non riuscivano ad avviarsi ("No qualifying bean of type 'JobExecutionHelper' available"). Il tag e' lasciato come e' (immagine 1.0.4 rotta, da non utilizzare), il fix del govpay.url esce come 1.0.5.
 
 	* [Fix]
 	Rimossa proprieta' govpay.url, non utilizzata. Il campo govpayUrl in GdeService era iniettato via @Value("${govpay.url}") senza default ma non veniva mai letto da nessun metodo. Risultato: dead code che pero' faceva fallire l'avvio dell'applicazione con "Could not resolve placeholder 'govpay.url'" se la proprieta' non era impostata (come emerso nel deploy dell'immagine 1.0.3 in ambiente locale). Rimosso il campo e il relativo import. Backport da main (commit d93d2bf).

@@ -1,11 +1,19 @@
 # Release Notes
 
-## v1.0.4 — 2026-07-01
+## v1.0.5 — 2026-07-01
 
 Release di manutenzione: rimossa una `@Value` senza default che faceva
 fail-fast dell'avvio quando la relativa property non era impostata in
 ambiente. Nessun cambio funzionale, dipendenze invariate rispetto a
 `1.0.3`.
+
+> **Perché 1.0.5 e non 1.0.4?** Il tag `1.0.4` era stato posizionato su
+> un commit del branch `main` (`9aeba17`) privo della `BatchInfraConfig`
+> introdotta nella `1.0.3`, quindi l'immagine `1.0.4` non riusciva ad
+> avviarsi (`No qualifying bean of type 'JobExecutionHelper' available`).
+> Il tag è stato lasciato inalterato per non riposizionare un tag
+> pubblico; l'immagine `1.0.4` è **da non utilizzare**. Il fix esce come
+> `1.0.5` sul commit corretto del branch `1.x.x`.
 
 ### Fix
 
@@ -35,8 +43,18 @@ Invariate rispetto a `1.0.3`.
 
 | File | Descrizione |
 | --- | --- |
-| `govpay-notify-batch-1.0.4.jar` | Fat JAR eseguibile (driver JDBC esclusi) |
-| `release-reports-1.0.4.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
+| `govpay-notify-batch-1.0.5.jar` | Fat JAR eseguibile (driver JDBC esclusi) |
+| `release-reports-1.0.5.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
+
+---
+
+## v1.0.4 — 2026-07-01 · **NON UTILIZZARE**
+
+Rilascio saltato: il tag `1.0.4` è stato posizionato su un commit del
+branch `main` privo della `BatchInfraConfig` introdotta nella `1.0.3`.
+L'immagine `linkitaly/govpay-notify-batch:1.0.4` non si avvia. Utilizzare
+`1.0.5`. Il tag non è stato rimosso per non riposizionare un tag già
+pubblicato.
 
 ---
 

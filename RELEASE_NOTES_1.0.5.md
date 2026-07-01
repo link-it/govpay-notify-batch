@@ -1,4 +1,4 @@
-# GovPay NOTIFY Batch — Release Notes v1.0.4
+# GovPay NOTIFY Batch — Release Notes v1.0.5
 
 Data: 2026-07-01
 Branch: `1.x.x`
@@ -7,6 +7,14 @@ Linea: 1.x (Spring Boot 3.5 + `govpay-common` 1.1.2)
 Hotfix release sopra `1.0.3`: rimossa una `@Value` senza default che
 faceva fail-fast dell'avvio quando la relativa property non era
 impostata in ambiente. Nessun cambio funzionale, dipendenze invariate.
+
+> **Nota sul salto di versione**: il tag `1.0.4` era stato posizionato
+> per errore su un commit del branch `main` (`9aeba17`) privo della
+> `BatchInfraConfig` introdotta nella `1.0.3`. L'immagine `1.0.4` non si
+> avvia (`No qualifying bean of type 'JobExecutionHelper' available`).
+> Il tag è stato lasciato inalterato per non riposizionare un tag già
+> pubblicato; l'immagine `1.0.4` è **da non utilizzare**. Il fix esce
+> come `1.0.5` sul commit corretto del branch `1.x.x`.
 
 ## Fix
 
@@ -28,7 +36,7 @@ da `GdeService`. Backport dal commit `d93d2bf` di `main`.
 ## Compatibilita'
 
 Nessun cambio di firma di env-var o di property. Chi sta su `1.0.3`
-puo' aggiornare a `1.0.4` cambiando solo il tag immagine. Se in
+puo' aggiornare a `1.0.5` cambiando solo il tag immagine. Se in
 precedenza si era aggiunta `GOVPAY_URL` al deployment per aggirare il
 fail-fast, la variabile puo' essere rimossa (era ignorata).
 
@@ -59,9 +67,9 @@ una versione corretta di `govpay-ec-client`.
 
 | File | Descrizione |
 | --- | --- |
-| `govpay-notify-batch-1.0.4.jar` | Fat JAR eseguibile (driver JDBC esclusi, vanno forniti via `LOADER_PATH`) |
+| `govpay-notify-batch-1.0.5.jar` | Fat JAR eseguibile (driver JDBC esclusi, vanno forniti via `LOADER_PATH`) |
 | `sql.zip` | Script SQL di inizializzazione (se aggiornati) |
-| `release-reports-1.0.4.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
+| `release-reports-1.0.5.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
 
 ## Riferimenti
 
