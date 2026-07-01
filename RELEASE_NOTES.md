@@ -1,8 +1,8 @@
 # Release Notes
 
-## v1.0.3 — 2026-06-30
+## v1.0.3 — 2026-07-01
 
-Release di manutenzione: due fix per lo startup del container + bump
+Release di manutenzione: tre fix per lo startup del container + bump
 delle dipendenze transitive per chiudere le CVE segnalate da OSV.
 
 ### Fix
@@ -25,6 +25,13 @@ delle dipendenze transitive per chiudere le CVE segnalate da OSV.
   `Cannot load driver class: org.postgresql.Driver`
   anche quando il volume `jdbc-drivers` era montato correttamente.
   Aggiunto anche log di conferma del path attivo.
+
+- **Placeholder `govpay.url` non risolvibile**: il campo `govpayUrl` di
+  `GdeService` era iniettato via `@Value("${govpay.url}")` senza
+  default, ma non veniva mai letto da nessun metodo. Dead code che
+  faceva pero' fallire l'avvio con
+  `Could not resolve placeholder 'govpay.url'` se la proprieta' non era
+  impostata. Rimosso il campo e il relativo import (backport da main).
 
 ### Sicurezza
 
