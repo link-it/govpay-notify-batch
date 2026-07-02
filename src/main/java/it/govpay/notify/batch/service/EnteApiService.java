@@ -128,7 +128,7 @@ public class EnteApiService {
 			rndInfo.setIur(rtInfo.getIur());
 			rndInfo.setIndice(BigDecimal.valueOf(rtInfo.getIndice()));
 			rndInfo.setImporto(rtInfo.getImporto());
-			rndInfo.setEsito(NuovaRendicontazione.EsitoEnum.fromValue(BigDecimal.valueOf(rtInfo.getEsito())));
+			rndInfo.setEsito(mapEsito(rtInfo.getEsito()));
 			rndInfo.setData(rtInfo.getData());
 			rndInfo.setIdFlusso(rtInfo.getIdFlusso());
 			rndInfo.setDataFlusso(rtInfo.getDataFlusso());
@@ -183,6 +183,26 @@ public class EnteApiService {
 		log.debug("Notificata ricevuta per l'organizzazione {} con iur {} e iuv {}", rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv());
 		gdeService.saveNotifyRndOk(rtInfo, jsonRequest, response, dataStart, dataEnd, enteBaseUrl);
 		return null;
+	}
+
+	/**
+	 * Mappa il codice esito numerico (DB) sull'enum stringa dell'API ec-client.
+	 * <p>In {@code govpay-ec-client:1.0.1} il codegen dell'enum e' stato corretto:
+	 * le costanti sono nominali ({@code ESEGUITO}, {@code REVOCATO}, ...) e
+	 * {@code fromValue} accetta {@code String}. Sui DB storici il campo esito
+	 * e' un intero: mappatura secondo la specifica pagoPA flussi rendicontazione
+	 * (0=ESEGUITO, 3=REVOCATO, 4=ESEGUITO_STANDIN, 8=ESEGUITO_STANDIN_SENZA_RPT,
+	 * 9=ESEGUITO_SENZA_RPT).
+	 */
+	private NuovaRendicontazione.EsitoEnum mapEsito(int esito) {
+		return switch (esito) {
+			case 0 -> NuovaRendicontazione.EsitoEnum.ESEGUITO;
+			case 3 -> NuovaRendicontazione.EsitoEnum.REVOCATO;
+			case 4 -> NuovaRendicontazione.EsitoEnum.ESEGUITO_STANDIN;
+			case 8 -> NuovaRendicontazione.EsitoEnum.ESEGUITO_STANDIN_SENZA_RPT;
+			case 9 -> NuovaRendicontazione.EsitoEnum.ESEGUITO_SENZA_RPT;
+			default -> throw new IllegalArgumentException("Codice esito rendicontazione non riconosciuto: " + esito);
+		};
 	}
 
 	/**

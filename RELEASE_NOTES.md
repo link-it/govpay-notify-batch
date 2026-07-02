@@ -1,5 +1,63 @@
 # Release Notes
 
+## v1.0.6 — 2026-07-02
+
+Release di manutenzione: bump di `govpay-ec-client` alla `1.0.1`, che
+corregge il codegen rotto di `NuovaRendicontazione.EsitoEnum`. Chiude la
+*Limitazione nota* citata nelle RELEASE_NOTES dalla `1.0.1` in poi: il
+path HTTP di notifica delle rendicontazioni e' ora effettivamente
+eseguibile a runtime.
+
+### Dipendenze
+
+- **`org.gov4j.govpay:govpay-ec-client`** `1.0.0` → `1.0.1`.
+  Codegen dell'enum corretto:
+  costanti nominali (`ESEGUITO`, `REVOCATO`, `ESEGUITO_STANDIN`,
+  `ESEGUITO_STANDIN_SENZA_RPT`, `ESEGUITO_SENZA_RPT`) al posto di
+  `NUMBER_null`/`NUMBER_null2`/..., `<clinit>` sano, `fromValue(String)`
+  al posto di `fromValue(BigDecimal)`.
+
+### Fix
+
+- **`EnteApiService`**: adattato all'API di ec-client 1.0.1. La chiamata
+  `EsitoEnum.fromValue(BigDecimal.valueOf(rtInfo.getEsito()))` (che nel
+  jar `1.0.0` esplodeva con `NumberFormatException` al primo accesso)
+  e' stata sostituita da un helper privato `mapEsito(int)` che mappa
+  esplicitamente i codici esito pagoPA numerici alle costanti nominali:
+
+  | Codice DB | Enum |
+  |---|---|
+  | `0` | `ESEGUITO` |
+  | `3` | `REVOCATO` |
+  | `4` | `ESEGUITO_STANDIN` |
+  | `8` | `ESEGUITO_STANDIN_SENZA_RPT` |
+  | `9` | `ESEGUITO_SENZA_RPT` |
+
+### Compatibilita'
+
+Nessun cambio di firma di env-var o di property. Chi sta su `1.0.5`
+puo' aggiornare a `1.0.6` cambiando solo il tag immagine.
+
+### Dipendenze principali
+
+| Artifact | Versione |
+| --- | --- |
+| `org.gov4j.govpay:govpay-bom` (parent) | `1.1.3` |
+| `org.gov4j.govpay:govpay-common` | `1.1.2` |
+| `org.gov4j.govpay:govpay-ec-client` | **`1.0.1`** |
+| `com.fasterxml.jackson:jackson-bom` (override) | `2.21.4` |
+| `io.netty:netty-bom` (override) | `4.1.135.Final` |
+| `org.apache.tomcat.embed:tomcat-embed-core` (override) | `10.1.55` |
+
+### Asset di release
+
+| File | Descrizione |
+| --- | --- |
+| `govpay-notify-batch-1.0.6.jar` | Fat JAR eseguibile (driver JDBC esclusi) |
+| `release-reports-1.0.6.zip` | Report OWASP, JaCoCo, OSV, SBOM, licenze e link al run di pipeline |
+
+---
+
 ## v1.0.5 — 2026-07-01
 
 Release di manutenzione: rimossa una `@Value` senza default che faceva

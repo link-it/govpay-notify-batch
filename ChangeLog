@@ -1,3 +1,14 @@
+2026-07-02  Giuliano Pintori <pintori@link.it>
+
+	* [Release]
+	Avanzata la versione del progetto a 1.0.6.
+
+	* [Dependencies]
+	govpay-ec-client: 1.0.0 -> 1.0.1. La nuova release del client corregge il codegen dell'enum NuovaRendicontazione.EsitoEnum: le costanti sono ora nominali (ESEGUITO, REVOCATO, ESEGUITO_STANDIN, ESEGUITO_STANDIN_SENZA_RPT, ESEGUITO_SENZA_RPT) al posto di NUMBER_null/NUMBER_null2/..., il <clinit> non fallisce piu' con NumberFormatException al primo accesso, e fromValue accetta ora String invece di BigDecimal. Chiude la "Limitazione nota" documentata dalla 1.0.1 in poi.
+
+	* [Fix]
+	EnteApiService: adattato all'API di ec-client 1.0.1. Sostituita la chiamata EsitoEnum.fromValue(BigDecimal.valueOf(rtInfo.getEsito())) con l'helper privato mapEsito(int) che mappa esplicitamente i codici esito pagoPA numerici (0->ESEGUITO, 3->REVOCATO, 4->ESEGUITO_STANDIN, 8->ESEGUITO_STANDIN_SENZA_RPT, 9->ESEGUITO_SENZA_RPT) sulle costanti nominali dell'enum. Il path HTTP di notifica delle rendicontazioni e' ora effettivamente eseguibile a runtime.
+
 2026-07-01  Giuliano Pintori <pintori@link.it>
 
 	* [Release]

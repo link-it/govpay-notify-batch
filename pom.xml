@@ -14,7 +14,7 @@
 
     <groupId>it.govpay</groupId>
     <artifactId>govpay-notify-batch</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
     <packaging>jar</packaging>
 
     <name>GovPay NOTIFY Batch</name>
@@ -147,7 +147,7 @@
         <dependency>
             <groupId>org.gov4j.govpay</groupId>
             <artifactId>govpay-ec-client</artifactId>
-            <version>1.0.0</version>
+            <version>1.0.1</version>
         </dependency>
 
         <!-- Spring Boot Starter for Batch -->
