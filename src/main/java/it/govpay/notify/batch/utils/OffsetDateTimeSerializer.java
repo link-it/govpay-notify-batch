@@ -1,18 +1,21 @@
 package it.govpay.notify.batch.utils;
 
-import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ser.std.StdScalarSerializer;
 
 import it.govpay.notify.batch.Costanti;
 
 /**
  * Custom serializer for OffsetDateTime to ensure consistent date format in JSON output.
  * Uses configurable date pattern for serialization (default: yyyy-MM-dd'T'HH:mm:ss.SSSXXX).
+ * <p>
+ * Migrato a Jackson 3 (tools.jackson): SerializerProvider e' stato rinominato
+ * SerializationContext, IOException e' stata sostituita da JacksonException.
  */
 public class OffsetDateTimeSerializer extends StdScalarSerializer<OffsetDateTime> {
 
@@ -38,7 +41,8 @@ public class OffsetDateTimeSerializer extends StdScalarSerializer<OffsetDateTime
 	}
 
 	@Override
-	public void serialize(OffsetDateTime dateTime, JsonGenerator jsonGenerator, SerializerProvider provider) throws IOException {
+	public void serialize(OffsetDateTime dateTime, JsonGenerator jsonGenerator, SerializationContext context)
+			throws JacksonException {
 		String dateTimeAsString = dateTime != null ? this.formatter.format(dateTime) : null;
 		jsonGenerator.writeString(dateTimeAsString);
 	}

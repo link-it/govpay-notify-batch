@@ -1,15 +1,15 @@
 package it.govpay.notify.batch.utils;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.deser.std.StdScalarDeserializer;
 
 /**
  * Custom deserializer for LocalDate that can handle both:
@@ -17,6 +17,9 @@ import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
  * - Full datetime format: "2025-03-12T00:00:00.000000+02:00"
  *
  * This is needed because pagoPA API sometimes sends datetime strings for date fields.
+ * <p>
+ * Migrato a Jackson 3 (tools.jackson): IOException sostituita da JacksonException
+ * nella firma di deserialize.
  */
 public class LocalDateFlexibleDeserializer extends StdScalarDeserializer<LocalDate> {
 
@@ -28,17 +31,12 @@ public class LocalDateFlexibleDeserializer extends StdScalarDeserializer<LocalDa
 
     @Override
     public LocalDate deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
-            throws IOException {
-        try {
-            JsonToken currentToken = jsonParser.getCurrentToken();
-            if (currentToken == JsonToken.VALUE_STRING) {
-                return parseLocalDate(jsonParser.getText());
-            } else {
-                return null;
-            }
-        } catch (IOException | DateTimeParseException e) {
-            throw new IOException("Failed to parse LocalDate: " + e.getMessage(), e);
+            throws JacksonException {
+        JsonToken currentToken = jsonParser.currentToken();
+        if (currentToken == JsonToken.VALUE_STRING) {
+            return parseLocalDate(jsonParser.getString());
         }
+        return null;
     }
 
     /**

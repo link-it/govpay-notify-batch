@@ -1,6 +1,5 @@
 package it.govpay.notify.batch.utils;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -10,10 +9,11 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 import java.util.Locale;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.deser.std.StdScalarDeserializer;
 
 import it.govpay.notify.batch.Costanti;
 
@@ -22,6 +22,9 @@ import it.govpay.notify.batch.Costanti;
  * Handles variable-length milliseconds (1-9 digits) from pagoPA API responses.
  * Also handles dates without seconds (e.g., 2025-12-09T00:00+01:00).
  * Falls back to CET timezone if parsing fails without timezone information.
+ * <p>
+ * Migrato a Jackson 3 (tools.jackson): IOException sostituita da JacksonException
+ * nella firma di deserialize.
  */
 public class OffsetDateTimeDeserializer extends StdScalarDeserializer<OffsetDateTime> {
 
@@ -79,17 +82,13 @@ public class OffsetDateTimeDeserializer extends StdScalarDeserializer<OffsetDate
 	}
 
 	@Override
-	public OffsetDateTime deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
-		try {
-			JsonToken currentToken = jsonParser.getCurrentToken();
-			if (currentToken == JsonToken.VALUE_STRING) {
-				return parseOffsetDateTime(jsonParser.getText(), this.formatter);
-			} else {
-				return null;
-			}
-		} catch (IOException | DateTimeParseException e) {
-			throw new IOException("Failed to parse OffsetDateTime: " + e.getMessage(), e);
+	public OffsetDateTime deserialize(JsonParser jsonParser, DeserializationContext deserializationContext)
+			throws JacksonException {
+		JsonToken currentToken = jsonParser.currentToken();
+		if (currentToken == JsonToken.VALUE_STRING) {
+			return parseOffsetDateTime(jsonParser.getString(), this.formatter);
 		}
+		return null;
 	}
 
 	/**

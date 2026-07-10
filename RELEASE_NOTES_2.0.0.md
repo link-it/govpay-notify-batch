@@ -14,8 +14,40 @@ durante la stabilizzazione.
 ### Migrazione dello stack
 
 Migrata l'intera catena a Spring Boot 4.x / Spring Framework 7.x /
-Spring Batch 6.x / Hibernate ORM 7.x / Jackson 3.x (nuovo groupId
-`tools.jackson`).
+Spring Batch 6.x / Hibernate ORM 7.x / **Jackson 3.x** (nuovo groupId
+`tools.jackson`). Il classpath **non** contiene piu' `com.fasterxml.jackson.core:jackson-databind`
+(Jackson 2): l'unico Jackson databind risolto e' `tools.jackson.core:jackson-databind:3.1.x`.
+`jackson-annotations` (in `com.fasterxml.jackson.annotation`) resta come
+artefatto condiviso tra Jackson 2 e 3 — e' l'unico riferimento residuo
+al vecchio groupId, per `@JsonInclude` e simili.
+
+Dettagli della migrazione Jackson 3:
+
+- `EnteApiClientConfig` costruisce un `tools.jackson.databind.json.JsonMapper`
+  via `JsonMapper.builder()`. `JavaTimeModule` non serve piu' (Java Time e'
+  built-in in Jackson 3). Le feature deprecate/rimosse
+  (`WRITE_DATES_AS_TIMESTAMPS`, `WRITE_DATES_WITH_ZONE_ID`,
+  `WRITE_ENUMS_USING_TO_STRING`, `READ_ENUMS_USING_TO_STRING`) sono state
+  eliminate perche' assorbite dai default: ISO-8601 sempre per date/time,
+  serializzazione enum via `@JsonValue`/`@JsonCreator` delle bean generate.
+  `NON_NULL` propagato via
+  `.changeDefaultPropertyInclusion(inc -> inc.withValueInclusion(NON_NULL))`.
+- `EnteApiService` / `EnteRicevutaApiService` iniettano `JsonMapper` e
+  registrano un `JacksonJsonHttpMessageConverter` (Spring 7) sul
+  `RestTemplate` del client EC, al posto del deprecato
+  `MappingJackson2HttpMessageConverter`. `JsonProcessingException`
+  sostituita da `JacksonException`.
+- I serializer/deserializer custom (`OffsetDateTimeSerializer`,
+  `OffsetDateTimeDeserializer`, `LocalDateFlexibleDeserializer`) usano le
+  nuove firme Jackson 3: `SerializationContext` al posto di
+  `SerializerProvider`, `throws JacksonException` al posto di
+  `throws IOException`, `parser.currentToken()` /
+  `parser.getString()` al posto di `getCurrentToken()` / `getText()`.
+  La `DateTimeParseException` viene rilanciata direttamente (non piu'
+  wrappata in `IOException`).
+- Rimossi dal `pom.xml`:
+  `com.fasterxml.jackson.core:jackson-databind` e
+  `com.fasterxml.jackson.datatype:jackson-datatype-jsr310`.
 
 Riorganizzazione dei package Spring Batch 6 nei sorgenti:
 

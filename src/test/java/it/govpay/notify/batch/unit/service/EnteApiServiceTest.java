@@ -23,8 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatusCode;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.json.JsonMapper;
 
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.common.entity.ApplicazioneEntity;
@@ -37,10 +36,6 @@ import it.govpay.notify.batch.service.EnteApiService;
 /**
  * Unit tests for EnteApiService.
  * <p>
- * NOTA: i path HTTP di {@code notifyRendicontazione} non sono coperti perché in
- * {@code govpay-ec-client:1.0.0} la classe {@code NuovaRendicontazione.EsitoEnum} ha tutti
- * i valori dichiarati come {@code new BigDecimal("null")}: il primo accesso al tipo lancia
- * {@code NumberFormatException} in {@code <clinit>} e impedisce qualsiasi invocazione reale.
  * I test sotto coprono il costruttore, {@code clearCache} e i fallimenti preflight.
  */
 @ExtendWith(MockitoExtension.class)
@@ -68,7 +63,7 @@ class EnteApiServiceTest {
 
     @BeforeEach
     void setUp() {
-        ObjectMapper realMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        JsonMapper realMapper = JsonMapper.builder().build();
         when(enteApiClientConfig.createEnteObjectMapper()).thenReturn(realMapper);
 
         service = new EnteApiService(connettoreService, applicazioneRepository, enteApiClientConfig, gdeService);
@@ -88,7 +83,7 @@ class EnteApiServiceTest {
 
     @Test
     @DisplayName("constructor invokes createEnteObjectMapper once")
-    void constructorBuildsObjectMapper() {
+    void constructorBuildsJsonMapper() {
         verify(enteApiClientConfig, times(1)).createEnteObjectMapper();
     }
 

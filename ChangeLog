@@ -10,6 +10,15 @@
 	- org.gov4j.govpay:govpay-common: 2.0.0-SNAPSHOT -> 2.0.0
 	- org.gov4j.govpay:govpay-ec-client: 2.0.0-SNAPSHOT -> 2.0.1
 
+	* [Refactor]
+	Completata la migrazione a Jackson 3 (tools.jackson): rimossi gli ultimi riferimenti a Jackson 2 (com.fasterxml.jackson.core/databind, com.fasterxml.jackson.datatype.jsr310) dal codice del batch. Il classpath ora contiene solo tools.jackson.core:jackson-databind:3.1.x, mentre Jackson 2 databind e' completamente escluso (jackson-annotations resta come artefatto condiviso tra Jackson 2 e 3).
+	Migrati:
+	- EnteApiClientConfig: JsonMapper.builder() di Jackson 3 al posto di new ObjectMapper() + JavaTimeModule (java.time e' built-in in J3). Rimosse le feature toggle rimosse in J3 (WRITE_DATES_AS_TIMESTAMPS, WRITE_ENUMS_USING_TO_STRING, ecc.) assorbite dai default: ISO-8601 sempre, enum serializzati via @JsonValue/@JsonCreator delle bean generate. Property inclusion NON_NULL configurato via changeDefaultPropertyInclusion (JsonInclude.Value UnaryOperator).
+	- EnteApiService / EnteRicevutaApiService: MappingJackson2HttpMessageConverter sostituito da JacksonJsonHttpMessageConverter (Spring 7), ObjectMapper del client EC sostituito da JsonMapper, JsonProcessingException sostituita da JacksonException.
+	- utils/OffsetDateTimeSerializer, OffsetDateTimeDeserializer, LocalDateFlexibleDeserializer: import da tools.jackson.*, firme aggiornate (SerializerProvider -> SerializationContext, throws IOException -> throws JacksonException, parser.getCurrentToken() -> currentToken(), parser.getText() -> getString()). La DateTimeParseException e' rilanciata direttamente (non piu' wrappata in IOException).
+	- Test unitari: allineati agli stessi cambi (JsonMapper, tools.jackson.*, propagazione DateTimeParseException).
+	Rimosse dal pom.xml le dipendenze com.fasterxml.jackson.core:jackson-databind e com.fasterxml.jackson.datatype:jackson-datatype-jsr310. Test 121/121 verdi.
+
 2026-06-30  Giuliano Pintori <pintori@link.it>
 
 	* [Fix]

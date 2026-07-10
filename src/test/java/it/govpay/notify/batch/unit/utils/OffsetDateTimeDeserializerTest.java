@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -16,8 +15,8 @@ import java.time.format.DateTimeParseException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
 
 import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.utils.OffsetDateTimeDeserializer;
@@ -91,10 +90,10 @@ class OffsetDateTimeDeserializerTest {
 
     @Test
     @DisplayName("deserialize parses string token to OffsetDateTime")
-    void deserializeStringToken() throws IOException {
+    void deserializeStringToken() {
         JsonParser parser = mock(JsonParser.class);
-        when(parser.getCurrentToken()).thenReturn(JsonToken.VALUE_STRING);
-        when(parser.getText()).thenReturn("2025-03-12T10:15:30.123+01:00");
+        when(parser.currentToken()).thenReturn(JsonToken.VALUE_STRING);
+        when(parser.getString()).thenReturn("2025-03-12T10:15:30.123+01:00");
 
         OffsetDateTime parsed = deserializer.deserialize(parser, null);
         assertEquals(OffsetDateTime.of(2025, 3, 12, 10, 15, 30, 123_000_000, ZoneOffset.ofHours(1)), parsed);
@@ -102,20 +101,20 @@ class OffsetDateTimeDeserializerTest {
 
     @Test
     @DisplayName("deserialize returns null for non-string token")
-    void deserializeNonStringToken() throws IOException {
+    void deserializeNonStringToken() {
         JsonParser parser = mock(JsonParser.class);
-        when(parser.getCurrentToken()).thenReturn(JsonToken.VALUE_NULL);
+        when(parser.currentToken()).thenReturn(JsonToken.VALUE_NULL);
 
         assertNull(deserializer.deserialize(parser, null));
     }
 
     @Test
-    @DisplayName("deserialize wraps parse exception as IOException")
-    void deserializeWrapsParseException() throws IOException {
+    @DisplayName("deserialize propagates DateTimeParseException for unparseable input")
+    void deserializePropagatesParseException() {
         JsonParser parser = mock(JsonParser.class);
-        when(parser.getCurrentToken()).thenReturn(JsonToken.VALUE_STRING);
-        when(parser.getText()).thenReturn("not-a-date");
+        when(parser.currentToken()).thenReturn(JsonToken.VALUE_STRING);
+        when(parser.getString()).thenReturn("not-a-date");
 
-        assertThrows(IOException.class, () -> deserializer.deserialize(parser, null));
+        assertThrows(DateTimeParseException.class, () -> deserializer.deserialize(parser, null));
     }
 }

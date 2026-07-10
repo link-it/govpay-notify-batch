@@ -9,11 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import it.govpay.common.client.model.Connettore;
 import it.govpay.common.client.service.ConnettoreService;
@@ -48,7 +48,7 @@ public class EnteRicevutaApiService {
     private final ConnettoreService connettoreService;
     private final ApplicazioneRepository applicazioneRepository;
     private final RicevutaV2Mapper ricevutaV2Mapper;
-    private final ObjectMapper clientObjectMapper;
+    private final JsonMapper clientObjectMapper;
     private final Duration connectTimeout;
     private final Duration readTimeout;
 
@@ -147,9 +147,8 @@ public class EnteRicevutaApiService {
             RestTemplate restTemplate = connettoreService.getRestTemplate(code);
             applicaTimeout(restTemplate);
 
-            MappingJackson2HttpMessageConverter converter =
-                    new MappingJackson2HttpMessageConverter(clientObjectMapper);
-            restTemplate.getMessageConverters().removeIf(MappingJackson2HttpMessageConverter.class::isInstance);
+            JacksonJsonHttpMessageConverter converter = new JacksonJsonHttpMessageConverter(clientObjectMapper);
+            restTemplate.getMessageConverters().removeIf(JacksonJsonHttpMessageConverter.class::isInstance);
             restTemplate.getMessageConverters().add(0, converter);
 
             Connettore connettore = connettoreService.getConnettore(code);

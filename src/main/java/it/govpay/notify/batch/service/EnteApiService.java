@@ -10,14 +10,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import it.govpay.common.client.model.Connettore;
 import it.govpay.common.client.service.ConnettoreService;
@@ -43,7 +43,7 @@ public class EnteApiService {
 	private final ConnettoreService connettoreService;
 	private final ApplicazioneRepository applicazioneRepository;
 	private final EnteApiClientConfig enteApiClientConfig;
-	private final ObjectMapper clientObjectMapper;
+	private final JsonMapper clientObjectMapper;
 
 	/** Cache of NotificaRendicontazioniApi instances keyed by connector code */
 	private final ConcurrentHashMap<String, NotificaRendicontazioniApi> apiCache = new ConcurrentHashMap<>();
@@ -87,10 +87,9 @@ public class EnteApiService {
 		return apiCache.computeIfAbsent(codConnettore, code -> {
 			RestTemplate restTemplate = connettoreService.getRestTemplate(code);
 
-			// Customize ObjectMapper for pagoPA date handling
-			MappingJackson2HttpMessageConverter converter =
-				new MappingJackson2HttpMessageConverter(clientObjectMapper);
-			restTemplate.getMessageConverters().removeIf(MappingJackson2HttpMessageConverter.class::isInstance);
+			// Customize JsonMapper (Jackson 3) for pagoPA date handling
+			JacksonJsonHttpMessageConverter converter = new JacksonJsonHttpMessageConverter(clientObjectMapper);
+			restTemplate.getMessageConverters().removeIf(JacksonJsonHttpMessageConverter.class::isInstance);
 			restTemplate.getMessageConverters().add(0, converter);
 
 			Connettore connettore = connettoreService.getConnettore(code);
@@ -171,7 +170,7 @@ public class EnteApiService {
 			statusCodeFuture.complete(HttpStatus.INTERNAL_SERVER_ERROR);
 			gdeService.saveNotifyRndKo(rtInfo, jsonRequest, response, e, dataStart, dataEnd, enteBaseUrl);
 			return "Internal error";
-		} catch (JsonProcessingException e) {
+		} catch (JacksonException e) {
 			dataEnd = OffsetDateTime.now(ZoneOffset.UTC);
 			log.error("Errore durante la notifica della ricevuta: taxCode {} - iur {} - iuv {}", rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv(), e);
 			statusCodeFuture.complete(HttpStatus.BAD_REQUEST);

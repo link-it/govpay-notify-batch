@@ -15,9 +15,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import tools.jackson.databind.json.JsonMapper;
 
 import it.govpay.notify.batch.config.EnteApiClientConfig;
 
@@ -33,22 +33,21 @@ class EnteApiClientConfigTest {
     }
 
     @Test
-    @DisplayName("createEnteObjectMapper returns a configured ObjectMapper")
+    @DisplayName("createEnteObjectMapper returns a configured JsonMapper (Jackson 3)")
     void createEnteObjectMapperConfigured() {
-        ObjectMapper mapper = config.createEnteObjectMapper();
+        JsonMapper mapper = config.createEnteObjectMapper();
 
         assertNotNull(mapper);
-        assertEquals(TimeZone.getTimeZone("Europe/Rome"), mapper.getSerializationConfig().getTimeZone());
-        assertTrue(mapper.isEnabled(DeserializationFeature.READ_ENUMS_USING_TO_STRING));
-        assertTrue(mapper.isEnabled(SerializationFeature.WRITE_ENUMS_USING_TO_STRING));
-        assertTrue(mapper.isEnabled(SerializationFeature.WRITE_DATES_WITH_ZONE_ID));
-        assertFalse(mapper.isEnabled(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
+        assertEquals(TimeZone.getTimeZone("Europe/Rome"),
+                mapper.serializationConfig().getTimeZone());
+        assertEquals(JsonInclude.Include.NON_NULL,
+                mapper.serializationConfig().getDefaultPropertyInclusion().getValueInclusion());
     }
 
     @Test
-    @DisplayName("ObjectMapper deserializes OffsetDateTime with flexible milliseconds")
-    void deserializeOffsetDateTime() throws Exception {
-        ObjectMapper mapper = config.createEnteObjectMapper();
+    @DisplayName("JsonMapper deserializes OffsetDateTime with flexible milliseconds")
+    void deserializeOffsetDateTime() {
+        JsonMapper mapper = config.createEnteObjectMapper();
         String json = "\"2025-03-12T10:15:30.1+01:00\"";
 
         OffsetDateTime parsed = mapper.readValue(json, OffsetDateTime.class);
@@ -58,9 +57,9 @@ class EnteApiClientConfigTest {
     }
 
     @Test
-    @DisplayName("ObjectMapper deserializes LocalDate from full datetime")
-    void deserializeLocalDateFromDatetime() throws Exception {
-        ObjectMapper mapper = config.createEnteObjectMapper();
+    @DisplayName("JsonMapper deserializes LocalDate from full datetime")
+    void deserializeLocalDateFromDatetime() {
+        JsonMapper mapper = config.createEnteObjectMapper();
         String json = "\"2025-03-12T00:00:00.000000+02:00\"";
 
         LocalDate parsed = mapper.readValue(json, LocalDate.class);
@@ -69,9 +68,9 @@ class EnteApiClientConfigTest {
     }
 
     @Test
-    @DisplayName("ObjectMapper serializes OffsetDateTime with 3-digit milliseconds")
-    void serializeOffsetDateTime() throws Exception {
-        ObjectMapper mapper = config.createEnteObjectMapper();
+    @DisplayName("JsonMapper serializes OffsetDateTime with 3-digit milliseconds")
+    void serializeOffsetDateTime() {
+        JsonMapper mapper = config.createEnteObjectMapper();
         OffsetDateTime input = OffsetDateTime.of(2025, 3, 12, 10, 15, 30, 123_000_000, ZoneOffset.ofHours(1));
 
         String json = mapper.writeValueAsString(input);
