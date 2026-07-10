@@ -1,3 +1,15 @@
+2026-07-10  Giuliano Pintori <pintori@link.it>
+
+	* [Release]
+	Avanzata la versione del progetto a 2.0.0 (release stabile).
+	Prima release ufficiale della linea 2.x, che consolida la migrazione a Spring Boot 4.x / Spring Framework 7.x / Spring Batch 6.x / Hibernate ORM 7.x / Jackson 3.x, aggiunge il porting del servizio di spedizione delle notifiche delle ricevute di pagamento (rtSendJob) all'API di integrazione dell'Ente, e include i fix di startup del container (BatchInfraConfig, LOADER_PATH, rimozione del placeholder govpay.url non utilizzato).
+
+	* [Dependencies]
+	Passaggio dalle -SNAPSHOT alle release stabili:
+	- org.gov4j.govpay:govpay-bom (parent): 2.0.0-SNAPSHOT -> 2.0.1
+	- org.gov4j.govpay:govpay-common: 2.0.0-SNAPSHOT -> 2.0.0
+	- org.gov4j.govpay:govpay-ec-client: 2.0.0-SNAPSHOT -> 2.0.1
+
 2026-06-30  Giuliano Pintori <pintori@link.it>
 
 	* [Fix]
