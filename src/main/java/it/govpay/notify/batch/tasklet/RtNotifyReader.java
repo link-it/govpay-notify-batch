@@ -72,14 +72,18 @@ public class RtNotifyReader implements ItemReader<RtNotifyContext>, StepExecutio
     }
 
     private Long convertToLong(Object object) {
+    	if (object == null)
+    		return null;
     	if (object instanceof Long longId)
     		return longId;
     	if (object instanceof BigInteger bigId)
     		return bigId.longValue();
-    	throw new IllegalArgumentException("Class not convert to long" + object.getClass().getName());
+    	throw new IllegalArgumentException("Class not convert to long " + object.getClass().getName());
 	}
 
     private Integer convertToInteger(Object object) {
+    	if (object == null)
+    		return null;
     	if (object instanceof Integer intValue)
     		return intValue.intValue();
     	if (object instanceof Long longValue)
@@ -90,6 +94,8 @@ public class RtNotifyReader implements ItemReader<RtNotifyContext>, StepExecutio
 	}
 
     private BigDecimal convertToBigDecimal(Object object) {
+    	if (object == null)
+    		return null;
     	if (object instanceof Double doubleValue)
     		return BigDecimal.valueOf(doubleValue);
     	if (object instanceof BigInteger bigValue)
@@ -100,6 +106,8 @@ public class RtNotifyReader implements ItemReader<RtNotifyContext>, StepExecutio
 	}
 
     private OffsetDateTime convertToOffsetDateTime(Object object) {
+    	if (object == null)
+    		return null;
     	if (object instanceof OffsetDateTime dateValue)
     		return dateValue;
     	if (object instanceof LocalDateTime dateValue)

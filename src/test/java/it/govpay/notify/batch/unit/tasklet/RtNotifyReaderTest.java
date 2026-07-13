@@ -223,4 +223,103 @@ class RtNotifyReaderTest {
             assertThrows(IllegalArgumentException.class, () -> reader.initToBeNotify());
         }
     }
+
+    /**
+     * Regressione per la 1.0.6: se una cella opzionale del ResultSet e' {@code null}
+     * gli helper {@code convertTo*} cadevano sul branch di errore che tenta
+     * {@code object.getClass()} sollevando {@link NullPointerException} prima
+     * dell'{@link IllegalArgumentException}, facendo abortire {@code beforeStep}.
+     * Ora ogni helper ritorna {@code null} se il valore in ingresso e' {@code null}.
+     */
+    @Nested
+    @DisplayName("null-safe converters (regressione 1.0.6 -> 1.0.7)")
+    class NullSafeConvertersTest {
+
+        @Test
+        @DisplayName("date null nella riga NON fanno esplodere il reader (fix del bug NPE 1.0.6)")
+        void nullOptionalDatesDoNotThrow() {
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            // Riproduce lo stacktrace del bug 1.0.6: cella data null in una qualsiasi
+            // delle colonne mappate da convertToOffsetDateTime.
+            row[7] = null;   // r.data
+            row[9] = null;   // fr.dataOraFlusso
+            row[11] = null;  // fr.dataRegolamento
+            row[12] = null;  // fr.dataOraPubblicazione
+            row[13] = null;  // fr.dataOraAggiornamento
+
+            List<Object[]> results = new ArrayList<>();
+            results.add(row);
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
+                    .thenReturn(results);
+
+            assertDoesNotThrow(reader::initToBeNotify);
+
+            RtNotifyContext result = reader.read();
+            assertNotNull(result);
+            assertEquals(1L, result.getRtId());
+            assertNull(result.getData());
+            assertNull(result.getDataFlusso());
+            assertNull(result.getDataRegolamento());
+            assertNull(result.getDataOraPubblicazione());
+            assertNull(result.getDataOraAggiornamento());
+        }
+
+        @Test
+        @DisplayName("importo null nella riga -> RtNotifyContext.importo == null")
+        void nullBigDecimalIsPropagated() {
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[5] = null; // r.importoPagato
+
+            List<Object[]> results = new ArrayList<>();
+            results.add(row);
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
+                    .thenReturn(results);
+
+            assertDoesNotThrow(reader::initToBeNotify);
+            RtNotifyContext result = reader.read();
+            assertNotNull(result);
+            assertNull(result.getImporto());
+        }
+
+        @Test
+        @DisplayName("id null (r.id) viene propagato come null da convertToLong")
+        void nullIdIsPropagated() {
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[0] = null;
+
+            List<Object[]> results = new ArrayList<>();
+            results.add(row);
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
+                    .thenReturn(results);
+
+            assertDoesNotThrow(reader::initToBeNotify);
+            RtNotifyContext result = reader.read();
+            assertNotNull(result);
+            assertNull(result.getRtId());
+        }
+
+        @Test
+        @DisplayName("un tipo non supportato continua a sollevare IllegalArgumentException, senza NPE")
+        void unsupportedTypeStillThrowsIllegalArgument() {
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[7] = "not-a-date"; // tipo non supportato per convertToOffsetDateTime
+
+            List<Object[]> results = new ArrayList<>();
+            results.add(row);
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
+                    .thenReturn(results);
+
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                    () -> reader.initToBeNotify());
+            assertTrue(ex.getMessage().contains("OffsetDateTime"));
+        }
+    }
 }
