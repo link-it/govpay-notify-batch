@@ -59,6 +59,85 @@ il reader. Le colonne obbligatorie continuano a comportarsi come prima
 Piccolo cleanup collaterale: sistemato lo spazio mancante nel messaggio
 d'errore di `convertToLong` (`"... to long" + name` → `"... to long " + name`).
 
+## Fix — Errori di configurazione della singola rendicontazione non piu' fatali
+
+Precedentemente, se una delle righe processate faceva parte di:
+
+- un'applicazione **non trovata** (`applicazioneRepository.findByCodApplicazione` ritorna `Optional.empty()`),
+- un'applicazione con **`cod_connettore_integrazione` null o blank**,
+- un **connettore inesistente o disabilitato** (`ABILITATO=false` in
+  `connettori`),
+
+`EnteApiService` propagava `IllegalStateException` / `IllegalArgumentException`
+al `RtNotifyProcessor`. Con lo step configurato senza `skipPolicy` e
+`chunk-size=1`, la prima riga problematica faceva:
+
+- rollback del chunk,
+- `rtNotifyStep` → `FAILED`,
+- `rtNotifyJob` → `FAILED`.
+
+Effetto: **tutte le altre rendicontazioni pendenti** (comprese quelle
+di applicazioni sane) **restavano non elaborate** fino al successivo
+tick del cron — dove il ciclo si ripeteva, con lo stesso esito.
+
+### Come si comporta ora
+
+Aggiunto in `notifyRendicontazione` un catch dedicato
+`catch (IllegalStateException | IllegalArgumentException e)` che:
+
+1. logga a `WARN` con contesto (rtId, taxCode, iur, iuv, messaggio
+   originale della configurazione — es. `"Connettore non abilitato: XYZ"`);
+2. completa lo `statusCodeFuture` con `HttpStatus.SERVICE_UNAVAILABLE`,
+   cosicche' il processor esiti la riga come **`KO`**;
+3. **non invia alcun evento al GDE**: la config non idonea significa
+   che non c'e' stata alcuna interazione con l'ente (nessuna request
+   HTTP inviata), quindi non c'e' nulla da tracciare come evento di
+   comunicazione — la segnalazione resta solo nei log applicativi;
+4. ritorna una stringa che inizia con `"Configurazione non idonea: "`,
+   rintracciabile nei log applicativi.
+
+Il writer chiama `registerNotificaRt` solo su esito `OK`, quindi la
+riga in `notifiche` **resta pending**: verra' ripescata al tick
+successivo del cron e reinviata automaticamente non appena la
+configurazione sara' corretta, senza intervento manuale.
+
+Il job continua a processare tutte le righe della coda. Al termine il
+run risulta `COMPLETED` con eventuali `KO` per le righe misconfigurate,
+senza far saltare le altre.
+
+### Nuova precondizione: versione API del connettore
+
+Alla lista di verifiche di "idoneita' del connettore" e' stata aggiunta
+la **versione dell'API di integrazione**. Il batch supporta unicamente
+la versione **v2** (`POST/PUT` sulle risorse `/ricevute` e
+`/rendicontazioni`); la v1 storica di govpay-core (SOAP + POST
+`/pagamenti`) non e' implementata.
+
+Su `govpay-common:1.1.2` il campo `versione` non e' ancora esposto
+come attributo tipizzato del modello `Connettore` (arriva su main con
+la 2.x). Fino ad allora la property viene letta tramite
+`ConnettoreService.getConnettoreAsMap(codConnettore)` e verificata
+contro la proprieta' `VERSIONE` della tabella `connettori`.
+
+Casistica gestita:
+
+| Contenuto property `VERSIONE`       | Comportamento                          |
+| ----------------------------------- | -------------------------------------- |
+| Assente / `null` / stringa blank    | KO configurazione non idonea, prosegue |
+| `REST_2`                            | Notifica eseguita normalmente          |
+| `REST_1` (v1 legacy)                | KO configurazione non idonea, prosegue |
+| Qualunque altro valore              | KO configurazione non idonea, prosegue |
+
+Il messaggio di log include il codice del connettore, il valore
+trovato e quello atteso, ad es.:
+
+```
+Notifica saltata per rtId 42 (taxCode 12345678901, iur IUR..., iuv 01...)
+ - configurazione non idonea:
+   Versione API del connettore CONN_ENTE_XYZ non supportata:
+   'REST_1' (attesa 'REST_2')
+```
+
 ## Compatibilita'
 
 Nessun cambio di firma di env-var o di property. Chi sta su `1.0.6`

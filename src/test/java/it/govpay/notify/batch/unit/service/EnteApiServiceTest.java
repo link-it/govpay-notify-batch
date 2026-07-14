@@ -1,7 +1,8 @@
 package it.govpay.notify.batch.unit.service;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -12,6 +13,9 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -21,11 +25,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import it.govpay.common.client.model.Connettore;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.common.entity.ApplicazioneEntity;
 import it.govpay.common.repository.ApplicazioneRepository;
@@ -93,39 +99,154 @@ class EnteApiServiceTest {
     }
 
     @Test
-    @DisplayName("throws IllegalStateException when applicazione is missing")
-    void notifyThrowsWhenApplicazioneMissing() {
+    @DisplayName("applicazione mancante -> segnalata come non idonea, NON solleva, future completato SERVICE_UNAVAILABLE")
+    void notifySkipsWhenApplicazioneMissing() {
         when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.empty());
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
 
-        assertThrows(IllegalStateException.class,
-                () -> service.notifyRendicontazione(rtInfo, new CompletableFuture<>()));
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(future.isDone());
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
         verify(gdeService, never()).saveNotifyRndOk(any(), any(), any(), any(), any(), anyString());
-        verify(gdeService, never()).saveNotifyRndKo(any(), any(), any(), any(), any(), any(), anyString());
+        verify(gdeService, never()).saveNotifyRndKo(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("throws IllegalStateException when codConnettore is null")
-    void notifyThrowsWhenConnettoreMissing() {
+    @DisplayName("codConnettore null -> segnalato come non idoneo, batch prosegue")
+    void notifySkipsWhenConnettoreMissing() {
         ApplicazioneEntity bad = new ApplicazioneEntity();
         bad.setCodApplicazione(COD_APP);
         bad.setCodConnettoreIntegrazione(null);
         when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(bad));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> service.notifyRendicontazione(rtInfo, new CompletableFuture<>()));
-        assert ex.getMessage().contains(COD_APP);
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.contains(COD_APP));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
     }
 
     @Test
-    @DisplayName("throws IllegalStateException when codConnettore is blank")
-    void notifyThrowsWhenConnettoreBlank() {
+    @DisplayName("codConnettore blank -> segnalato come non idoneo, batch prosegue")
+    void notifySkipsWhenConnettoreBlank() {
         ApplicazioneEntity bad = new ApplicazioneEntity();
         bad.setCodApplicazione(COD_APP);
         bad.setCodConnettoreIntegrazione("   ");
         when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(bad));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
 
-        assertThrows(IllegalStateException.class,
-                () -> service.notifyRendicontazione(rtInfo, new CompletableFuture<>()));
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
+    @DisplayName("connettore non abilitato (IllegalArgumentException da common) -> segnalato come non idoneo")
+    void notifySkipsWhenConnettoreDisabled() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        when(connettoreService.getConnettore(COD_CONN))
+                .thenThrow(new IllegalArgumentException("Connettore non abilitato: " + COD_CONN));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.contains("non abilitato"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
+    @DisplayName("VERSIONE assente sul connettore -> segnalato come non idoneo, batch prosegue")
+    void notifySkipsWhenVersioneMissing() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Collections.emptyMap());
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(msg.contains("VERSIONE"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+        verify(gdeService, never()).saveNotifyRndKo(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("VERSIONE blank -> segnalato come non idoneo")
+    void notifySkipsWhenVersioneBlank() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        Map<String, String> props = new HashMap<>();
+        props.put("VERSIONE", "   ");
+        when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(props);
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
+    @DisplayName("VERSIONE = REST_1 (non supportata) -> segnalato come non idoneo")
+    void notifySkipsWhenVersioneRest1() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        when(connettoreService.getConnettoreAsMap(COD_CONN))
+                .thenReturn(Map.of("VERSIONE", "REST_1"));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(msg.contains("REST_1"));
+        assertTrue(msg.contains("REST_2"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
+    @DisplayName("VERSIONE = valore ignoto -> segnalato come non idoneo")
+    void notifySkipsWhenVersioneUnknown() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        when(connettoreService.getConnettoreAsMap(COD_CONN))
+                .thenReturn(Map.of("VERSIONE", "SOAP_1"));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(msg.contains("SOAP_1"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
     }
 
     @Test
@@ -138,17 +259,6 @@ class EnteApiServiceTest {
     }
 
     @Test
-    @DisplayName("future is left incomplete on preflight failure")
-    void futureIncompleteOnPreflight() {
-        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.empty());
-        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
-
-        assertThrows(IllegalStateException.class,
-                () -> service.notifyRendicontazione(rtInfo, future));
-        assertFalse(future.isDone());
-    }
-
-    @Test
     @DisplayName("uses connector code for cache key (resolved via repository)")
     void resolveConnectorCodeUsesRepository() {
         ApplicazioneEntity ae = new ApplicazioneEntity();
@@ -156,13 +266,16 @@ class EnteApiServiceTest {
         ae.setCodConnettoreIntegrazione(COD_CONN);
         when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ae));
 
-        // Anche se il flusso completo fallirà sul EsitoEnum.<clinit>, la lookup è invocata prima:
+        // Il flusso completo potrebbe non arrivare fino alla POST HTTP (dipende dai mock
+        // di connettoreService); qui verifichiamo solo che la lookup dell'applicazione
+        // sia stata invocata almeno una volta.
         try {
             service.notifyRendicontazione(rtInfo, new CompletableFuture<>());
         } catch (Throwable ignored) {
-            // expected — see class javadoc
+            // ok — non ci interessa l'esito HTTP in questo test
         }
 
-        verify(applicazioneRepository, times(1)).findByCodApplicazione(COD_APP);
+        verify(applicazioneRepository, org.mockito.Mockito.atLeastOnce())
+                .findByCodApplicazione(COD_APP);
     }
 }

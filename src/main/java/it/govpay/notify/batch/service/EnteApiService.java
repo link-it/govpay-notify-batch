@@ -3,6 +3,7 @@ package it.govpay.notify.batch.service;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +39,16 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class EnteApiService {
+
+	// Property key sulla tabella `connettori` che indica la versione dell'API di integrazione.
+	// Su govpay-common:1.1.2 non e' ancora esposta come campo tipizzato sul modello Connettore,
+	// quindi va letta via getConnettoreAsMap. Coincide con it.govpay.common.entity.VersioneApi su main.
+	private static final String CONNETTORE_PROP_VERSIONE = "VERSIONE";
+
+	// Unica versione dell'API di integrazione supportata da questo batch.
+	// La v1 (POST /pagamenti) non e' implementata: se il connettore e' configurato su REST_1
+	// il record viene marcato come "configurazione non idonea" e il job prosegue con gli altri.
+	private static final String VERSIONE_API_SUPPORTATA = "REST_2";
 
 	private final GdeService gdeService;
 	private final ConnettoreService connettoreService;
@@ -111,17 +122,44 @@ public class EnteApiService {
 		return connettoreService.getConnettore(codConnettore).getUrl();
 	}
 
+	/**
+	 * Verifica che il connettore associato all'applicazione sia configurato sulla
+	 * versione API supportata da questo batch (REST_2). Se la proprieta' VERSIONE
+	 * e' assente o diversa da {@value #VERSIONE_API_SUPPORTATA} solleva
+	 * IllegalStateException, gia' intercettata dal catch "configurazione non idonea"
+	 * di notifyRendicontazione (il record va in KO ma il job prosegue).
+	 */
+	private void validateConnectorVersion(String codApplicazione) {
+		String codConnettore = resolveConnectorCode(codApplicazione);
+		Map<String, String> props = connettoreService.getConnettoreAsMap(codConnettore);
+		String versione = props.get(CONNETTORE_PROP_VERSIONE);
+		if (versione == null || versione.isBlank()) {
+			throw new IllegalStateException(
+					"Versione API non configurata sul connettore " + codConnettore
+							+ " (proprieta' " + CONNETTORE_PROP_VERSIONE + " assente): attesa '"
+							+ VERSIONE_API_SUPPORTATA + "'");
+		}
+		String normalized = versione.trim();
+		if (!VERSIONE_API_SUPPORTATA.equals(normalized)) {
+			throw new IllegalStateException(
+					"Versione API del connettore " + codConnettore + " non supportata: '"
+							+ versione + "' (attesa '" + VERSIONE_API_SUPPORTATA + "')");
+		}
+	}
+
 
 	public String notifyRendicontazione(RtNotifyContext rtInfo, CompletableFuture<HttpStatusCode> statusCodeFuture) throws RestClientException {
 		log.debug("Notifica ricevuta per l'organizzazione {} con iur {} e iuv {}", rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv());
 		OffsetDateTime dataStart = OffsetDateTime.now(ZoneOffset.UTC);
 		OffsetDateTime dataEnd = null;
-		String enteBaseUrl = getBaseUrl(rtInfo.getCodApplicazione());
-
+		String enteBaseUrl = null;
 
 		String jsonRequest = null;
 		ResponseEntity<Void> response = null;
 		try {
+			enteBaseUrl = getBaseUrl(rtInfo.getCodApplicazione());
+			validateConnectorVersion(rtInfo.getCodApplicazione());
+
 			NuovaRendicontazione rndInfo = new NuovaRendicontazione();
 			rndInfo.setIdDominio(rtInfo.getTaxCode());
 			rndInfo.setIuv(rtInfo.getIuv());
@@ -145,6 +183,18 @@ public class EnteApiService {
 			response = getOrCreateApi(rtInfo.getCodApplicazione()).notificaRendicontazioneWithHttpInfo(rndInfo);
 			statusCodeFuture.complete(response.getStatusCode());
 			dataEnd = OffsetDateTime.now(ZoneOffset.UTC);
+		} catch (IllegalStateException | IllegalArgumentException e) {
+			// Configurazione non idonea (applicazione non trovata, connettore non configurato,
+			// connettore non abilitato, versione API non supportata, ecc.): NON deve far fallire
+			// il job. L'item viene segnato in errore (statusCode SERVICE_UNAVAILABLE -> "KO" nel
+			// processor) e il batch prosegue con le altre righe della coda.
+			// L'evento NON viene inviato al GDE: non c'e' stata alcuna interazione con l'ente
+			// (nessuna richiesta HTTP inviata), quindi non c'e' nulla da tracciare come evento
+			// di comunicazione. La segnalazione avviene solo via log applicativo.
+			log.warn("Notifica saltata per rtId {} (taxCode {}, iur {}, iuv {}) - configurazione non idonea: {}",
+					rtInfo.getRtId(), rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv(), e.getMessage());
+			statusCodeFuture.complete(HttpStatus.SERVICE_UNAVAILABLE);
+			return "Configurazione non idonea: " + e.getMessage();
 		} catch (HttpClientErrorException.BadRequest e) {
 			// 400 Bad Request
 			dataEnd = OffsetDateTime.now(ZoneOffset.UTC);
