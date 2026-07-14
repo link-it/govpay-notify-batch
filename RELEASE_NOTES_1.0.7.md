@@ -189,7 +189,8 @@ aspettavano l'invio via v1, e' opportuno:
 
 ## Dipendenze principali
 
-Invariate rispetto a `1.0.6`.
+Rispetto alla `1.0.6` sono invariate ad eccezione di `logback` (bumpato
+da `1.5.28` a `1.5.35` per risolvere due CVE, vedi sotto).
 
 | Artifact                                              | Versione        |
 | ----------------------------------------------------- | --------------- |
@@ -199,6 +200,23 @@ Invariate rispetto a `1.0.6`.
 | `com.fasterxml.jackson:jackson-bom` (override)        | `2.21.4`        |
 | `io.netty:netty-bom` (override)                       | `4.1.135.Final` |
 | `org.apache.tomcat.embed:tomcat-embed-core` (override) | `10.1.55`       |
+| `ch.qos.logback:logback-classic` / `logback-core` (override) | `1.5.35`  |
+
+## CVE risolte in questa release
+
+Bump di `logback` per due CVE segnalate da OSV scan (entrambe risolte
+elevando `logback-classic` e `logback-core` alla `1.5.35`):
+
+| Advisory | CVSS | Artifact | Fix version |
+| --- | --- | --- | --- |
+| [GHSA-jhq6-gfmj-v8fx](https://osv.dev/GHSA-jhq6-gfmj-v8fx) | 2.9 | `ch.qos.logback:logback-core` | `1.5.35` |
+| [GHSA-p47f-322f-whfh](https://osv.dev/GHSA-p47f-322f-whfh) | 1.2 | `ch.qos.logback:logback-core` | `1.5.33` |
+
+Il parent `spring-boot-dependencies` (via `govpay-bom` 1.1.3) importava
+`1.5.28`; sono state aggiunte una property `logback.version` e voci di
+`dependencyManagement` per entrambi gli artifact — stesso pattern gia'
+usato per `jackson-bom`, perche' la sola property viene sovrascritta
+dal parent BOM.
 
 ## Asset di release
 

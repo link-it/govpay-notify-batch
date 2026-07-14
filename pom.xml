@@ -37,6 +37,11 @@
                9m89-8frq-c98c, fv25-8xcx-gqjc, gx5v-xp9w-j4cg, h6fc-48rj-7qqh, r29c-68gh-xp6x) -->
         <jackson-bom.version>2.21.4</jackson-bom.version>
         <tomcat.version>10.1.55</tomcat.version>
+        <!-- Override logback per CVE risolte (OSV scan):
+             - GHSA-jhq6-gfmj-v8fx (CVSS 2.9) fixed in 1.5.35
+             - GHSA-p47f-322f-whfh (CVSS 1.2) fixed in 1.5.33
+             Bump di logback-classic e logback-core in coppia (stessa versione). -->
+        <logback.version>1.5.35</logback.version>
     </properties>
 
     <repositories>
@@ -117,6 +122,23 @@
                 <version>${jackson-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+
+            <!-- Override logback-classic e logback-core per CVE risolte (OSV scan):
+                 GHSA-jhq6-gfmj-v8fx (CVSS 2.9, fixed 1.5.35) e GHSA-p47f-322f-whfh
+                 (CVSS 1.2, fixed 1.5.33). Bump entrambi alla stessa versione perche'
+                 logback-classic dipende internamente da logback-core. Il parent
+                 spring-boot-dependencies (via govpay-bom 1.1.3) impone 1.5.28: senza
+                 questo override la property non basta. -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>${logback.version}</version>
             </dependency>
 
             <!-- Override Netty BOM per CVE risolte (OSV scan, fixed in 4.1.135.Final):

@@ -27,6 +27,9 @@
 	* [Test]
 	Aggiunti test unitari per i tre fix strutturali post-audit del 1.0.7: (a) RtNotifyReaderTest.nullIntegerFieldsAreBoxedNotUnboxed - simula r.indiceDati/r.esito/fr.revisione tutti NULL nella riga e verifica che il reader costruisca RtNotifyContext senza NPE con i tre getter che tornano null; (b) EventoRtMapperTest.nullDataStartDoesNotThrow/nullDataEndDoesNotThrow/bothDatesNullDoesNotThrow - verificano che createEvento con dataStart e/o dataEnd null NON solleva NPE e produce un evento con durataEvento null; (c) EnteApiServiceTest.notifySkipsWhenIndiceMissing/notifySkipsWhenEsitoMissing - verificano che un context con indice o esito null viene trattato come config non idonea (SERVICE_UNAVAILABLE + no GDE + no throw). Totale suite: 112 test, 0 failure.
 
+	* [Dependencies]
+	Bump di logback-classic e logback-core dalla 1.5.28 (imposta da spring-boot-dependencies via govpay-bom 1.1.3) alla 1.5.35 per risolvere due CVE segnalate da OSV scan: GHSA-jhq6-gfmj-v8fx (CVSS 2.9, fixed in 1.5.35) e GHSA-p47f-322f-whfh (CVSS 1.2, fixed in 1.5.33). Aggiunta property logback.version e voci di dependency management per entrambi gli artifact (la property da sola non basta perche' viene sovrascritta dal parent BOM, stesso pattern gia' usato per jackson-bom). Bump non funzionale, dep tree verificato via mvn dependency:tree.
+
 2026-07-02  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
