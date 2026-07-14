@@ -250,6 +250,51 @@ class EnteApiServiceTest {
     }
 
     @Test
+    @DisplayName("indice null nel context -> segnalato come dato obbligatorio mancante (skip, batch prosegue)")
+    void notifySkipsWhenIndiceMissing() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Map.of("VERSIONE", "REST_2"));
+
+        RtNotifyContext ctxNoIndice = rtInfo.toBuilder().indice(null).build();
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(ctxNoIndice, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(msg.contains("indice"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+        verify(gdeService, never()).saveNotifyRndKo(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("esito null nel context -> segnalato come dato obbligatorio mancante (skip)")
+    void notifySkipsWhenEsitoMissing() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Map.of("VERSIONE", "REST_2"));
+
+        RtNotifyContext ctxNoEsito = rtInfo.toBuilder().esito(null).build();
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(ctxNoEsito, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(msg.contains("esito"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
     @DisplayName("clearCache delegates to ConnettoreService and is idempotent")
     void clearCacheDelegates() {
         service.clearCache();

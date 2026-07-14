@@ -160,13 +160,26 @@ public class EnteApiService {
 			enteBaseUrl = getBaseUrl(rtInfo.getCodApplicazione());
 			validateConnectorVersion(rtInfo.getCodApplicazione());
 
+			// Campi obbligatori sull'API di integrazione (@Nonnull sul setter generato):
+			// se assenti dai dati DB il record e' invio-inidoneo. Sollevo IllegalStateException
+			// che verra' intercettata dal catch "configurazione non idonea" sotto, il record
+			// va in KO e il batch prosegue con gli altri.
+			if (rtInfo.getIndice() == null) {
+				throw new IllegalStateException(
+						"Dato obbligatorio mancante per rtId " + rtInfo.getRtId() + ": indice");
+			}
+			if (rtInfo.getEsito() == null) {
+				throw new IllegalStateException(
+						"Dato obbligatorio mancante per rtId " + rtInfo.getRtId() + ": esito");
+			}
+
 			NuovaRendicontazione rndInfo = new NuovaRendicontazione();
 			rndInfo.setIdDominio(rtInfo.getTaxCode());
 			rndInfo.setIuv(rtInfo.getIuv());
 			rndInfo.setIur(rtInfo.getIur());
-			rndInfo.setIndice(BigDecimal.valueOf(rtInfo.getIndice()));
+			rndInfo.setIndice(BigDecimal.valueOf(rtInfo.getIndice().longValue()));
 			rndInfo.setImporto(rtInfo.getImporto());
-			rndInfo.setEsito(mapEsito(rtInfo.getEsito()));
+			rndInfo.setEsito(mapEsito(rtInfo.getEsito().intValue()));
 			rndInfo.setData(rtInfo.getData());
 			rndInfo.setIdFlusso(rtInfo.getIdFlusso());
 			rndInfo.setDataFlusso(rtInfo.getDataFlusso());

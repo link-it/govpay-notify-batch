@@ -305,6 +305,34 @@ class RtNotifyReaderTest {
         }
 
         @Test
+        @DisplayName("indice/esito/revisione null NON fanno esplodere il builder (RtNotifyContext usa Integer boxed)")
+        void nullIntegerFieldsAreBoxedNotUnboxed() {
+            // Regressione per l'audit post-1.0.7: RtNotifyContext ha campi indice/esito/revisione
+            // dichiarati come Integer (nullable) proprio per evitare NPE da auto-unboxing nel builder
+            // Lombok quando convertToInteger ritorna null (colonne che nel legacy possono essere NULL,
+            // in particolare fr.revisione). Se in futuro qualcuno reintroduce un primitivo int, questo
+            // test fallisce prima che si arrivi in produzione.
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[4] = null;   // r.indiceDati
+            row[6] = null;   // r.esito
+            row[16] = null;  // fr.revisione
+
+            List<Object[]> results = new ArrayList<>();
+            results.add(row);
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
+                    .thenReturn(results);
+
+            assertDoesNotThrow(reader::initToBeNotify);
+            RtNotifyContext result = reader.read();
+            assertNotNull(result);
+            assertNull(result.getIndice());
+            assertNull(result.getEsito());
+            assertNull(result.getRevisione());
+        }
+
+        @Test
         @DisplayName("un tipo non supportato continua a sollevare IllegalArgumentException, senza NPE")
         void unsupportedTypeStillThrowsIllegalArgument() {
             RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
