@@ -65,7 +65,12 @@ public class EventoRtMapper {
         nuovoEvento.setCategoriaEvento(CategoriaEvento.INTERFACCIA);
         nuovoEvento.setClusterId(clusterId);
         nuovoEvento.setDataEvento(dataStart);
-        nuovoEvento.setDurataEvento(dataEnd.toInstant().toEpochMilli() - dataStart.toInstant().toEpochMilli());
+        // durataEvento richiede entrambi i timestamp; se uno manca lascio il campo nullo
+        // invece di sollevare NPE. dataStart/dataEnd sono valorizzati da EnteApiService in
+        // tutti i path noti, ma il guard difende da regressioni future.
+        if (dataStart != null && dataEnd != null) {
+            nuovoEvento.setDurataEvento(dataEnd.toInstant().toEpochMilli() - dataStart.toInstant().toEpochMilli());
+        }
         nuovoEvento.setRuolo(RuoloEvento.CLIENT);
         nuovoEvento.setComponente(ComponenteEvento.API_ENTE);
         nuovoEvento.setTipoEvento(tipoEvento);

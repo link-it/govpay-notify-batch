@@ -102,6 +102,38 @@ class EventoRtMapperTest {
             assertNull(evento.getCcp());
             assertNull(evento.getDatiPagoPA());
         }
+
+        @Test
+        @DisplayName("dataStart null NON solleva NPE, durataEvento resta null")
+        void nullDataStartDoesNotThrow() {
+            // Difesa contro il caso in cui un futuro path chiami createEvento senza aver settato
+            // dataStart: prima del guard la sottrazione dataEnd.toInstant() - dataStart.toInstant()
+            // sollevava NPE facendo abortire l'invio dell'evento GDE.
+            NuovoEvento evento = assertDoesNotThrow(
+                    () -> mapper.createEvento(rtInfo, TIPO_EVENTO, TRANSACTION_ID, null, dataEnd));
+            assertNotNull(evento);
+            assertNull(evento.getDurataEvento());
+            assertNull(evento.getDataEvento());
+        }
+
+        @Test
+        @DisplayName("dataEnd null NON solleva NPE, durataEvento resta null")
+        void nullDataEndDoesNotThrow() {
+            NuovoEvento evento = assertDoesNotThrow(
+                    () -> mapper.createEvento(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, null));
+            assertNotNull(evento);
+            assertNull(evento.getDurataEvento());
+            assertEquals(dataStart, evento.getDataEvento());
+        }
+
+        @Test
+        @DisplayName("entrambe le date null -> evento comunque creato senza NPE")
+        void bothDatesNullDoesNotThrow() {
+            NuovoEvento evento = assertDoesNotThrow(
+                    () -> mapper.createEvento(rtInfo, TIPO_EVENTO, TRANSACTION_ID, null, null));
+            assertNotNull(evento);
+            assertNull(evento.getDurataEvento());
+        }
     }
 
     @Nested

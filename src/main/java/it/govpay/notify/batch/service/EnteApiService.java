@@ -3,6 +3,7 @@ package it.govpay.notify.batch.service;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +27,7 @@ import it.govpay.common.repository.ApplicazioneRepository;
 import it.govpay.ec.client.api.NotificaRendicontazioniApi;
 import it.govpay.ec.client.api.impl.ApiClient;
 import it.govpay.ec.client.beans.NuovaRendicontazione;
+import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.dto.RtNotifyContext;
 import it.govpay.notify.batch.gde.service.GdeService;
@@ -110,24 +112,71 @@ public class EnteApiService {
 		return connettoreService.getConnettore(codConnettore).getUrl();
 	}
 
+	/**
+	 * Verifica che il connettore associato all'applicazione sia configurato sulla
+	 * versione API supportata (REST_2). Solleva IllegalStateException se assente/
+	 * blank o diversa, cosi' viene intercettata dal catch "configurazione non
+	 * idonea" di notifyRendicontazione (il record va in KO ma il job prosegue).
+	 * <p>Allineato al pattern di {@link it.govpay.notify.batch.rt.service.EnteRicevutaApiService}:
+	 * la versione e' letta via {@code ConnettoreService.getConnettoreAsMap}. Dopo
+	 * l'adozione del campo tipizzato {@code Connettore.getVersione()} (gia' esposto
+	 * da govpay-common 2.0.0 ma non ancora usato altrove nel progetto) e' possibile
+	 * unificare.
+	 */
+	private void validateConnectorVersion(String codApplicazione) {
+		String codConnettore = resolveConnectorCode(codApplicazione);
+		Map<String, String> props = connettoreService.getConnettoreAsMap(codConnettore);
+		if (props == null || props.isEmpty()) {
+			throw new IllegalStateException("Connettore non configurato: " + codConnettore);
+		}
+		String versione = props.get(Costanti.CONNETTORE_PROPRIETA_VERSIONE);
+		if (versione == null || versione.isBlank()) {
+			throw new IllegalStateException(
+					"Versione API non configurata sul connettore " + codConnettore
+							+ " (proprieta' " + Costanti.CONNETTORE_PROPRIETA_VERSIONE + " assente): attesa '"
+							+ Costanti.VERSIONE_API_EC_SUPPORTATA + "'");
+		}
+		if (!Costanti.VERSIONE_API_EC_SUPPORTATA.equals(versione.trim())) {
+			throw new IllegalStateException(
+					"Versione API del connettore " + codConnettore + " non supportata: '"
+							+ versione + "' (attesa '" + Costanti.VERSIONE_API_EC_SUPPORTATA + "')");
+		}
+	}
+
 
 	public String notifyRendicontazione(RtNotifyContext rtInfo, CompletableFuture<HttpStatusCode> statusCodeFuture) throws RestClientException {
 		log.debug("Notifica ricevuta per l'organizzazione {} con iur {} e iuv {}", rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv());
 		OffsetDateTime dataStart = OffsetDateTime.now(ZoneOffset.UTC);
 		OffsetDateTime dataEnd = null;
-		String enteBaseUrl = getBaseUrl(rtInfo.getCodApplicazione());
+		String enteBaseUrl = null;
 
 
 		String jsonRequest = null;
 		ResponseEntity<Void> response = null;
 		try {
+			enteBaseUrl = getBaseUrl(rtInfo.getCodApplicazione());
+			validateConnectorVersion(rtInfo.getCodApplicazione());
+
+			// Campi obbligatori sull'API di integrazione (@Nonnull sul setter generato):
+			// se assenti dai dati DB il record e' invio-inidoneo. Sollevo IllegalStateException
+			// che verra' intercettata dal catch "configurazione non idonea" sotto, il record
+			// va in KO e il batch prosegue con gli altri.
+			if (rtInfo.getIndice() == null) {
+				throw new IllegalStateException(
+						"Dato obbligatorio mancante per rtId " + rtInfo.getRtId() + ": indice");
+			}
+			if (rtInfo.getEsito() == null) {
+				throw new IllegalStateException(
+						"Dato obbligatorio mancante per rtId " + rtInfo.getRtId() + ": esito");
+			}
+
 			NuovaRendicontazione rndInfo = new NuovaRendicontazione();
 			rndInfo.setIdDominio(rtInfo.getTaxCode());
 			rndInfo.setIuv(rtInfo.getIuv());
 			rndInfo.setIur(rtInfo.getIur());
-			rndInfo.setIndice(BigDecimal.valueOf(rtInfo.getIndice()));
+			rndInfo.setIndice(BigDecimal.valueOf(rtInfo.getIndice().longValue()));
 			rndInfo.setImporto(rtInfo.getImporto());
-			rndInfo.setEsito(mapEsito(rtInfo.getEsito()));
+			rndInfo.setEsito(mapEsito(rtInfo.getEsito().intValue()));
 			rndInfo.setData(rtInfo.getData());
 			rndInfo.setIdFlusso(rtInfo.getIdFlusso());
 			rndInfo.setDataFlusso(rtInfo.getDataFlusso());
@@ -144,6 +193,18 @@ public class EnteApiService {
 			response = getOrCreateApi(rtInfo.getCodApplicazione()).notificaRendicontazioneWithHttpInfo(rndInfo);
 			statusCodeFuture.complete(response.getStatusCode());
 			dataEnd = OffsetDateTime.now(ZoneOffset.UTC);
+		} catch (IllegalStateException | IllegalArgumentException e) {
+			// Configurazione non idonea (applicazione non trovata, connettore non configurato,
+			// versione API non supportata, dato obbligatorio mancante, ecc.): NON deve far fallire
+			// il job. L'item viene segnato in errore (statusCode SERVICE_UNAVAILABLE -> "KO" nel
+			// processor) e il batch prosegue con le altre righe della coda.
+			// L'evento NON viene inviato al GDE: non c'e' stata alcuna interazione con l'ente
+			// (nessuna richiesta HTTP inviata), quindi non c'e' nulla da tracciare come evento
+			// di comunicazione. La segnalazione avviene solo via log applicativo.
+			log.warn("Notifica saltata per rtId {} (taxCode {}, iur {}, iuv {}) - configurazione non idonea: {}",
+					rtInfo.getRtId(), rtInfo.getTaxCode(), rtInfo.getIur(), rtInfo.getIuv(), e.getMessage());
+			statusCodeFuture.complete(HttpStatus.SERVICE_UNAVAILABLE);
+			return "Configurazione non idonea: " + e.getMessage();
 		} catch (HttpClientErrorException.BadRequest e) {
 			// 400 Bad Request
 			dataEnd = OffsetDateTime.now(ZoneOffset.UTC);
