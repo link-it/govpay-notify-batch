@@ -1,5 +1,9 @@
 2026-07-15  Giuliano Pintori <pintori@link.it>
 
+	* [Release]
+	Avanzata la versione del progetto a 2.0.1.
+	Release di manutenzione della linea 2.x: raccoglie i backport dei fix di robustezza gia' rilasciati con la 1.0.7 sulla linea 1.x, uniformando il comportamento del rtNotifyJob a quello del rtSendJob (una singola rendicontazione con configurazione non idonea non fa piu' abortire l'intero run).
+
 	* [Fix]
 	RtNotifyReader: gli helper convertToLong/convertToInteger/convertToBigDecimal/convertToOffsetDateTime non gestivano il caso in cui la cella del ResultSet fosse null: cadevano nel branch di errore che tenta object.getClass().getName() sollevando NullPointerException prima dell'IllegalArgumentException, con conseguente fallimento dello step rtNotifyStep durante il beforeStep (initToBeNotify). Aggiunto guard iniziale "if (object == null) return null;" a tutti e quattro gli helper, cosi' le colonne opzionali (es. cod_bic_riversamento, iur di fr, ecc.) non fanno piu' abortire il batch. Sistemato anche un piccolo refuso nel messaggio d'errore di convertToLong (mancava lo spazio prima del class name). Backport da 1.0.7 sulla linea 1.x.
 
