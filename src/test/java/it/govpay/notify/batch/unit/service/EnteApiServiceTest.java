@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -64,6 +67,9 @@ class EnteApiServiceTest {
     @Mock
     private GdeService gdeService;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private EnteApiService service;
 
     private static final String COD_APP = "APP_TEST";
@@ -75,8 +81,14 @@ class EnteApiServiceTest {
     void setUp() {
         JsonMapper realMapper = JsonMapper.builder().build();
         when(enteApiClientConfig.createEnteObjectMapper()).thenReturn(realMapper);
+        // Il transactionManager mock viene invocato dal TransactionTemplate NOT_SUPPORTED
+        // solo per le lookup su ConnettoreService (getConnettore/getConnettoreAsMap). Non
+        // tutti i test arrivano fin li' (alcuni falliscono prima su applicazione mancante),
+        // quindi il stubbing e' 'lenient' per evitare UnnecessaryStubbing.
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenReturn(new SimpleTransactionStatus());
 
-        service = new EnteApiService(connettoreService, applicazioneRepository, enteApiClientConfig, gdeService);
+        service = new EnteApiService(connettoreService, applicazioneRepository, enteApiClientConfig, gdeService, transactionManager);
 
         rtInfo = RtNotifyContext.builder()
                 .rtId(1L)
@@ -161,6 +173,35 @@ class EnteApiServiceTest {
         assertNotNull(msg);
         assertTrue(msg.contains("non abilitato"));
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
+    @DisplayName("lookup del connettore avviene in transazione PROPAGATION_NOT_SUPPORTED (fix UnexpectedRollbackException)")
+    void connettoreLookupIsolatedFromOuterTransaction() {
+        // Regressione: ConnettoreService di govpay-common ha @Transactional(readOnly = true)
+        // a livello di classe. Quando getConnettore lancia IllegalArgumentException, Spring
+        // marca la transazione outer (quella del chunk Spring Batch) come rollback-only, e al
+        // commit del chunk viene sollevata UnexpectedRollbackException facendo fallire lo step.
+        // La fix wrappa la chiamata in un TransactionTemplate NOT_SUPPORTED che sospende la
+        // trans outer per la durata della lookup. Questo test verifica strutturalmente che il
+        // TransactionTemplate venga effettivamente invocato per ogni tentativo di getConnettore
+        // (il transactionManager mock deve ricevere getTransaction() prima della chiamata al
+        // ConnettoreService, non solo dopo).
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        when(connettoreService.getConnettore(COD_CONN))
+                .thenThrow(new IllegalArgumentException("Connettore non trovato o non abilitato: " + COD_CONN));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        service.notifyRendicontazione(rtInfo, future);
+
+        // Il TransactionTemplate NOT_SUPPORTED chiama getTransaction(def) all'ingresso e
+        // commit() all'uscita per ciascuna lookup isolata. Se qualcuno reintroduce una
+        // chiamata diretta a connettoreService.getConnettore fuori dal template, questo
+        // verify fallisce.
+        verify(transactionManager, org.mockito.Mockito.atLeastOnce()).getTransaction(any());
     }
 
     @Test

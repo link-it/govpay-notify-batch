@@ -11,6 +11,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.common.entity.ApplicazioneEntity;
@@ -28,6 +30,7 @@ class EnteRicevutaApiServiceTest {
     private ConnettoreService connettoreService;
     private ApplicazioneRepository applicazioneRepository;
     private RicevutaV2Mapper mapper;
+    private PlatformTransactionManager transactionManager;
     private EnteRicevutaApiService service;
 
     @BeforeEach
@@ -35,13 +38,18 @@ class EnteRicevutaApiServiceTest {
         connettoreService = mock(ConnettoreService.class);
         applicazioneRepository = mock(ApplicazioneRepository.class);
         mapper = mock(RicevutaV2Mapper.class);
+        transactionManager = mock(PlatformTransactionManager.class);
+        // Il TransactionTemplate NOT_SUPPORTED costruito dal service invoca il manager
+        // per sospendere la trans outer. Il mock restituisce uno status vuoto: commit e
+        // rollback saranno no-op.
+        when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 
         EnteApiClientConfig config = new EnteApiClientConfig();
         // valore minimo necessario per createEnteObjectMapper
         org.springframework.test.util.ReflectionTestUtils.setField(config, "timezone", "Europe/Rome");
 
         service = new EnteRicevutaApiService(connettoreService, applicazioneRepository,
-                config, mapper, 1000L, 1000L);
+                config, mapper, transactionManager, 1000L, 1000L);
     }
 
     private Notifica notificaFor(String codApplicazione) {

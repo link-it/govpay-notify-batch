@@ -14,7 +14,7 @@
 
     <groupId>it.govpay</groupId>
     <artifactId>govpay-notify-batch</artifactId>
-    <version>2.0.1</version>
+    <version>2.0.2</version>
     <packaging>jar</packaging>
 
     <name>GovPay NOTIFY Batch</name>
@@ -27,6 +27,12 @@
 
         <!-- SonarCloud -->
         <sonar.coverage.exclusions>**/test/**,**/*Test*.java</sonar.coverage.exclusions>
+
+        <!-- Override PostgreSQL JDBC per CVE risolta (OSV scan):
+             - GHSA-j92g-9f8w-j867 (CVSS 8.2) fixed in 42.7.12.
+             La property pgjdbc.version viene sovrascritta dal parent (Spring Boot dep
+             management), per questo va aggiunto anche l'override in dependencyManagement. -->
+        <postgresql.version>42.7.12</postgresql.version>
     </properties>
 
     <repositories>
@@ -41,6 +47,19 @@
             </snapshots>
         </repository>
     </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Override PostgreSQL JDBC per GHSA-j92g-9f8w-j867 (CVSS 8.2, fixed in 42.7.12).
+                 Il parent Spring Boot fissa la versione a 42.7.11 (sovrascrivendo la property
+                 pgjdbc.version); serve override esplicito qui. -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <profiles>
 		<profile>

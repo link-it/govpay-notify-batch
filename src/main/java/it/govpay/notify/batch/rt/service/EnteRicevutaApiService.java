@@ -11,6 +11,9 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestTemplate;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -52,6 +55,18 @@ public class EnteRicevutaApiService {
     private final Duration connectTimeout;
     private final Duration readTimeout;
 
+    /**
+     * Isola le lookup su ConnettoreService dalla transazione del chunk Spring Batch.
+     * ConnettoreService di govpay-common ha class-level @Transactional(readOnly = true):
+     * quando getConnettore/getConnettoreAsMap sollevano IllegalArgumentException il
+     * TransactionInterceptor di Spring marca la transazione outer come rollback-only
+     * anche se il chiamante intercetta l'eccezione. Al commit del chunk verrebbe
+     * sollevata UnexpectedRollbackException facendo fallire l'intero step. Con
+     * NOT_SUPPORTED la trans-outer viene sospesa per la durata della lookup: se
+     * lancia il rollback resta confinato e la trans-outer riparte pulita.
+     */
+    private final TransactionTemplate txNotSupported;
+
     private final ConcurrentHashMap<String, NotificaRicevuteApi> apiCache = new ConcurrentHashMap<>();
 
     public EnteRicevutaApiService(
@@ -59,6 +74,7 @@ public class EnteRicevutaApiService {
             ApplicazioneRepository applicazioneRepository,
             EnteApiClientConfig enteApiClientConfig,
             RicevutaV2Mapper ricevutaV2Mapper,
+            PlatformTransactionManager transactionManager,
             @Value("${govpay.batch.rt-send.http.connect-timeout-ms:10000}") long connectTimeoutMs,
             @Value("${govpay.batch.rt-send.http.read-timeout-ms:30000}") long readTimeoutMs) {
         this.connettoreService = connettoreService;
@@ -67,6 +83,16 @@ public class EnteRicevutaApiService {
         this.clientObjectMapper = enteApiClientConfig.createEnteObjectMapper();
         this.connectTimeout = Duration.ofMillis(connectTimeoutMs);
         this.readTimeout = Duration.ofMillis(readTimeoutMs);
+        this.txNotSupported = new TransactionTemplate(transactionManager);
+        this.txNotSupported.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+    }
+
+    private Connettore getConnettoreIsolated(String codConnettore) {
+        return txNotSupported.execute(status -> connettoreService.getConnettore(codConnettore));
+    }
+
+    private Map<String, String> getConnettoreAsMapIsolated(String codConnettore) {
+        return txNotSupported.execute(status -> connettoreService.getConnettoreAsMap(codConnettore));
     }
 
     /**
@@ -128,7 +154,7 @@ public class EnteRicevutaApiService {
      * {@code connettoreService.getConnettore(code).getVersione()}.
      */
     private void verificaVersioneSupportata(String codConnettore) {
-        Map<String, String> props = connettoreService.getConnettoreAsMap(codConnettore);
+        Map<String, String> props = getConnettoreAsMapIsolated(codConnettore);
         if (props == null || props.isEmpty()) {
             throw new IllegalStateException(
                     "Connettore non configurato: " + codConnettore);
@@ -151,7 +177,7 @@ public class EnteRicevutaApiService {
             restTemplate.getMessageConverters().removeIf(JacksonJsonHttpMessageConverter.class::isInstance);
             restTemplate.getMessageConverters().add(0, converter);
 
-            Connettore connettore = connettoreService.getConnettore(code);
+            Connettore connettore = getConnettoreIsolated(code);
             ApiClient apiClient = new ApiClient(restTemplate);
             apiClient.setBasePath(connettore.getUrl());
 
