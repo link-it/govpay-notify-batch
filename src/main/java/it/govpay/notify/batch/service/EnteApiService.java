@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -56,18 +59,51 @@ public class EnteApiService {
 	private final EnteApiClientConfig enteApiClientConfig;
 	private final ObjectMapper clientObjectMapper;
 
+	/**
+	 * TransactionTemplate con PROPAGATION_NOT_SUPPORTED usato per isolare le lookup su
+	 * ConnettoreService dalla transazione del chunk Spring Batch. ConnettoreService di
+	 * govpay-common ha class-level @Transactional(readOnly = true): quando getConnettore
+	 * o getConnettoreAsMap sollevano IllegalArgumentException, il TransactionInterceptor
+	 * di Spring marca la transazione outer (quella del chunk) come rollback-only ANCHE
+	 * se il chiamante intercetta l'eccezione. Al commit del chunk, Spring solleva
+	 * UnexpectedRollbackException ("Transaction silently rolled back because it has been
+	 * marked as rollback-only") facendo fallire lo step. Wrappando la chiamata in
+	 * NOT_SUPPORTED sospendiamo la trans-outer per la durata della lookup: se lancia,
+	 * il rollback resta confinato e la trans-outer riparte pulita.
+	 */
+	private final TransactionTemplate txNotSupported;
+
 	/** Cache of NotificaRendicontazioniApi instances keyed by connector code */
 	private final ConcurrentHashMap<String, NotificaRendicontazioniApi> apiCache = new ConcurrentHashMap<>();
 
 	public EnteApiService(ConnettoreService connettoreService,
 						  ApplicazioneRepository applicazioneRepository,
 						  EnteApiClientConfig rtApiClientConfig,
-						  GdeService gdeService) {
+						  GdeService gdeService,
+						  PlatformTransactionManager transactionManager) {
 		this.connettoreService = connettoreService;
 		this.applicazioneRepository = applicazioneRepository;
 		this.enteApiClientConfig = rtApiClientConfig;
 		this.gdeService = gdeService;
 		this.clientObjectMapper = enteApiClientConfig.createEnteObjectMapper();
+		this.txNotSupported = new TransactionTemplate(transactionManager);
+		this.txNotSupported.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+	}
+
+	/**
+	 * Wrapper che chiama {@link ConnettoreService#getConnettore(String)} sospendendo
+	 * la transazione outer. Vedi {@link #txNotSupported} per il razionale.
+	 */
+	private Connettore getConnettoreIsolated(String codConnettore) {
+		return txNotSupported.execute(status -> connettoreService.getConnettore(codConnettore));
+	}
+
+	/**
+	 * Wrapper che chiama {@link ConnettoreService#getConnettoreAsMap(String)} sospendendo
+	 * la transazione outer. Vedi {@link #txNotSupported} per il razionale.
+	 */
+	private Map<String, String> getConnettoreAsMapIsolated(String codConnettore) {
+		return txNotSupported.execute(status -> connettoreService.getConnettoreAsMap(codConnettore));
 	}
 
 	/**
@@ -104,7 +140,7 @@ public class EnteApiService {
 			restTemplate.getMessageConverters().removeIf(MappingJackson2HttpMessageConverter.class::isInstance);
 			restTemplate.getMessageConverters().add(0, converter);
 
-			Connettore connettore = connettoreService.getConnettore(code);
+			Connettore connettore = getConnettoreIsolated(code);
 			ApiClient apiClient = new ApiClient(restTemplate);
 			apiClient.setBasePath(connettore.getUrl());
 
@@ -119,7 +155,7 @@ public class EnteApiService {
 	 */
 	private String getBaseUrl(String codApplicazione) {
 		String codConnettore = resolveConnectorCode(codApplicazione);
-		return connettoreService.getConnettore(codConnettore).getUrl();
+		return getConnettoreIsolated(codConnettore).getUrl();
 	}
 
 	/**
@@ -131,7 +167,7 @@ public class EnteApiService {
 	 */
 	private void validateConnectorVersion(String codApplicazione) {
 		String codConnettore = resolveConnectorCode(codApplicazione);
-		Map<String, String> props = connettoreService.getConnettoreAsMap(codConnettore);
+		Map<String, String> props = getConnettoreAsMapIsolated(codConnettore);
 		String versione = props.get(CONNETTORE_PROP_VERSIONE);
 		if (versione == null || versione.isBlank()) {
 			throw new IllegalStateException(

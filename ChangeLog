@@ -1,3 +1,15 @@
+2026-07-15  Giuliano Pintori <pintori@link.it>
+
+	* [Release]
+	Avanzata la versione del progetto a 1.0.8.
+	Hotfix critico sopra la 1.0.7: in produzione lo step continuava a fallire con "UnexpectedRollbackException: Transaction silently rolled back because it has been marked as rollback-only" quando un record aveva connettore non trovato/non abilitato, nonostante il catch "configurazione non idonea" introdotto in 1.0.7.
+
+	* [Fix]
+	EnteApiService: le chiamate a ConnettoreService.getConnettore(...) e getConnettoreAsMap(...) vengono ora eseguite dentro un TransactionTemplate con PROPAGATION_NOT_SUPPORTED. Root cause del bug: ConnettoreService (govpay-common:1.1.2) ha @Transactional(readOnly = true) a livello di classe; quando i suoi metodi sollevano IllegalArgumentException ("Connettore non trovato o non abilitato: ..." / "Connettore non abilitato: ..." / "Connettore non trovato: ..."), il TransactionInterceptor di Spring marca la transazione outer come rollback-only PRIMA che il chiamante possa intercettare l'eccezione. Anche se EnteApiService cattura correttamente l'eccezione nel catch "configurazione non idonea" e ritorna normalmente, la transazione del chunk Spring Batch (chunk-oriented step con chunk-size=1) resta marcata rollback-only e al commit Spring solleva UnexpectedRollbackException, facendo fallire rtNotifyStep e di conseguenza l'intero rtNotifyJob. Il fix isola le lookup del connettore dentro un TransactionTemplate NOT_SUPPORTED che sospende la trans outer per la durata della chiamata: se getConnettore lancia, il rollback resta confinato in una trans temporanea e la trans-outer del chunk riparte pulita. Le due chiamate a ConnettoreService in EnteApiService (in getBaseUrl/getOrCreateApi via getConnettore, e in validateConnectorVersion via getConnettoreAsMap) sono state entrambe wrappate tramite helper getConnettoreIsolated / getConnettoreAsMapIsolated. Il costruttore di EnteApiService ha ora una dipendenza aggiuntiva su PlatformTransactionManager.
+
+	* [Test]
+	Aggiunto test connettoreLookupIsolatedFromOuterTransaction in EnteApiServiceTest che verifica strutturalmente l'invocazione del TransactionTemplate: il mock del PlatformTransactionManager deve ricevere getTransaction(def) per ogni lookup del connettore. Se qualcuno reintroduce una chiamata diretta a connettoreService.getConnettore (bypassando il template) il test fallisce. Aggiornati anche gli altri test EnteApiServiceTest per il nuovo costruttore (aggiunto mock del PlatformTransactionManager). Totale suite: 112 test, 0 failure.
+
 2026-07-13  Giuliano Pintori <pintori@link.it>
 
 	* [Release]
