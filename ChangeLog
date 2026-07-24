@@ -13,6 +13,9 @@
 	* [Dependencies]
 	Bump di postgresql (driver JDBC) dalla 42.7.11 alla 42.7.12 per risolvere GHSA-j92g-9f8w-j867 (CVSS 8.2). Aggiunta property postgresql.version e nuovo blocco dependencyManagement con override esplicito (il parent Spring Boot fissa 42.7.11 sovrascrivendo la property pgjdbc.version, quindi la sola property non basta - stesso pattern gia' usato nella linea 1.x per jackson-bom). Il driver PostgreSQL e' scope=provided nel profilo jar (fornito via LOADER_PATH a runtime), quindi il bump agisce sul jar che finisce nell'immagine docker e nel volume jdbc-drivers. Nota: jackson-databind e netty non vengono bumpati perche' su main il classpath contiene tools.jackson (Jackson 3.1.4, non affetto dalle CVE Jackson 2.x) e netty 4.2.15.Final gia' incluso dal govpay-bom 2.0.1 (linea 4.2.x, distinta da quella 4.1.x che richiede il bump a 4.1.136 sulla linea 1.x).
 
+	* [Dependencies]
+	Bump di govpay-common dalla 2.0.1-SNAPSHOT alla 2.0.2 (release stabile su Maven Central).
+
 	* [Test]
 	Aggiornati EnteApiServiceTest e EnteRicevutaApiServiceTest per la nuova dipendenza PlatformTransactionManager. Aggiunto test connettoreLookupIsolatedFromOuterTransaction in EnteApiServiceTest come regressione strutturale: verifica che il TransactionTemplate venga effettivamente invocato per ogni lookup del connettore (se qualcuno reintroduce una chiamata diretta bypassando il template il test fallisce). Suite: 136 test, 0 failure.
 
