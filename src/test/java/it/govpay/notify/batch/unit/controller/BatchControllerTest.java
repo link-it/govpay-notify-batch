@@ -18,10 +18,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import it.govpay.common.batch.dto.BatchInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.controller.BatchController;
 import it.govpay.notify.batch.service.EnteApiService;
+import jakarta.persistence.EntityManager;
 
 @DisplayName("BatchController")
 class BatchControllerTest {
@@ -33,6 +35,7 @@ class BatchControllerTest {
     private EnteApiService enteApiService;
     private Environment environment;
     private ZoneId applicationZoneId;
+    private EntityManager entityManager;
 
     private BatchController controller;
 
@@ -45,6 +48,7 @@ class BatchControllerTest {
         enteApiService = mock(EnteApiService.class);
         environment = mock(Environment.class);
         applicationZoneId = ZoneId.of("Europe/Rome");
+        entityManager = mock(EntityManager.class);
 
         controller = buildController(true);
     }
@@ -59,7 +63,8 @@ class BatchControllerTest {
                 environment,
                 applicationZoneId,
                 3_600_000L,
-                rtSendEnabled);
+                rtSendEnabled,
+                entityManager);
     }
 
     @Test
@@ -74,6 +79,32 @@ class BatchControllerTest {
     void getJobNameReturnsConstant() {
         String result = ReflectionTestUtils.invokeMethod(controller, "getJobName");
         assertEquals(Costanti.RT_NOTIFY_JOB_NAME, result);
+    }
+
+    @Test
+    @DisplayName("getDisplayName/getDescription return non-blank strings")
+    void getDisplayNameAndDescriptionReturnNonBlankStrings() {
+        String displayName = ReflectionTestUtils.invokeMethod(controller, "getDisplayName");
+        String description = ReflectionTestUtils.invokeMethod(controller, "getDescription");
+
+        assertNotNull(displayName);
+        assertNotNull(description);
+        org.junit.jupiter.api.Assertions.assertFalse(displayName.isBlank());
+        org.junit.jupiter.api.Assertions.assertFalse(description.isBlank());
+    }
+
+    @Test
+    @DisplayName("info (inherited) returns 200 with jobName/displayName/description")
+    void infoEndpointReturnsBatchInfo() {
+        ResponseEntity<BatchInfo> response = controller.info();
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        BatchInfo info = response.getBody();
+        assertNotNull(info);
+        assertEquals(Costanti.RT_NOTIFY_JOB_NAME, info.getJobName());
+        assertEquals(ReflectionTestUtils.invokeMethod(controller, "getDisplayName"), info.getDisplayName());
+        assertEquals(ReflectionTestUtils.invokeMethod(controller, "getDescription"), info.getDescription());
     }
 
     @Test
