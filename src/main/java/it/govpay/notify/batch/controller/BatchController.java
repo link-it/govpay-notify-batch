@@ -21,6 +21,7 @@ import it.govpay.common.batch.dto.NextExecutionInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.service.EnteApiService;
+import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -45,8 +46,9 @@ public class BatchController extends AbstractBatchController {
             Environment environment,
             ZoneId applicationZoneId,
             @Value("${scheduler.rtNotifyJob.fixedDelayString:7200000}") long schedulerIntervalMillis,
-            @Value("${govpay.batch.rt-send.enabled:false}") boolean rtSendEnabled) {
-        super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis);
+            @Value("${govpay.batch.rt-send.enabled:false}") boolean rtSendEnabled,
+            EntityManager entityManager) {
+        super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis, entityManager);
         this.rtNotifyJob = rtNotifyJob;
         this.rtSendJob = rtSendJob;
         this.rtSendEnabled = rtSendEnabled;
@@ -61,6 +63,17 @@ public class BatchController extends AbstractBatchController {
     @Override
     protected String getJobName() {
         return Costanti.RT_NOTIFY_JOB_NAME;
+    }
+
+    @Override
+    protected String getDisplayName() {
+        return "Notifica ricevute (RT) all'Ente Creditore";
+    }
+
+    @Override
+    protected String getDescription() {
+        return "Individua le rendicontazioni acquisite ma non ancora notificate all'applicazione dell'Ente "
+                + "Creditore e le invia tramite chiamata REST verso l'endpoint configurato sul connettore.";
     }
 
     @Override
