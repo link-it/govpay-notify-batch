@@ -1,5 +1,6 @@
 package it.govpay.notify.batch.rt.tasklet;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,13 +29,16 @@ import lombok.extern.slf4j.Slf4j;
 public class RtSendReader implements ItemReader<NotificaContext> {
 
     private final NotificheRepository notificheRepository;
+    private final Clock clock;
     private final int pageSize;
 
     private List<NotificaContext> buffer;
 
     public RtSendReader(NotificheRepository notificheRepository,
+                        Clock clock,
                         @Value("${govpay.batch.rt-send.chunk-size:50}") int pageSize) {
         this.notificheRepository = notificheRepository;
+        this.clock = clock;
         this.pageSize = pageSize;
     }
 
@@ -55,7 +59,7 @@ public class RtSendReader implements ItemReader<NotificaContext> {
     }
 
     private void loadBatch() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         List<Notifica> notifiche = notificheRepository.findNotificheDaSpedire(
                 TipoNotifica.RICEVUTA,
                 StatoSpedizione.DA_SPEDIRE,

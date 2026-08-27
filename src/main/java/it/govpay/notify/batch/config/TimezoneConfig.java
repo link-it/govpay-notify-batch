@@ -1,5 +1,6 @@
 package it.govpay.notify.batch.config;
 
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.TimeZone;
 
@@ -36,5 +37,16 @@ public class TimezoneConfig {
     @Bean
     public ZoneId applicationZoneId() {
         return ZoneId.of(timezone);
+    }
+
+    /**
+     * Orologio applicativo agganciato al timezone configurato: e' la sorgente
+     * unica del "tempo corrente" per reader, processor, writer e listener del
+     * batch. Va usato al posto delle {@code now()} senza argomenti, che
+     * dipendono dal default della JVM (implicito e non sostituibile nei test).
+     */
+    @Bean
+    public Clock applicationClock(ZoneId applicationZoneId) {
+        return Clock.system(applicationZoneId);
     }
 }

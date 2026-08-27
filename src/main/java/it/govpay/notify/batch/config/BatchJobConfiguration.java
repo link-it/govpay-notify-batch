@@ -65,8 +65,11 @@ public class BatchJobConfiguration {
         RtNotifyProcessor rtNotifyProcessor,
         RtNotifyWriter rtNotifyWriter
     ) {
+        // chunk(size).transactionManager(tm): la variante chunk(size, tm) e' deprecata
+        // per la rimozione in Spring Batch 6.
         return new StepBuilder("rtNotifyStep", jobRepository)
-            .<RtNotifyContext, RtNotifyBatch>chunk(batchProperties.getNotifyChunkSize(), transactionManager)
+            .<RtNotifyContext, RtNotifyBatch>chunk(batchProperties.getNotifyChunkSize())
+            .transactionManager(transactionManager)
             .reader(rtNotifyReader)
             .processor(rtNotifyProcessor)
             .writer(rtNotifyWriter)

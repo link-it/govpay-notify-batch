@@ -21,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import it.govpay.common.batch.dto.BatchInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.notify.batch.Costanti;
+import it.govpay.notify.batch.config.BatchControllerSupport;
 import it.govpay.notify.batch.controller.BatchController;
 import it.govpay.notify.batch.service.EnteApiService;
 import jakarta.persistence.EntityManager;
@@ -54,17 +55,14 @@ class BatchControllerTest {
     }
 
     private BatchController buildController(boolean rtSendEnabled) {
-        return new BatchController(
+        BatchControllerSupport support = new BatchControllerSupport(
                 jobExecutionHelper,
                 jobRepository,
-                rtNotifyJob,
-                rtSendJob,
-                enteApiService,
                 environment,
                 applicationZoneId,
                 3_600_000L,
-                rtSendEnabled,
                 entityManager);
+        return new BatchController(support, rtNotifyJob, rtSendJob, enteApiService, rtSendEnabled);
     }
 
     @Test
@@ -142,7 +140,7 @@ class BatchControllerTest {
 
     @Test
     @DisplayName("eseguiJobEndpoint avvia anche rtSendJob in modalita' best-effort (flag abilitato)")
-    void eseguiJobEndpointAlsoTriggersRtSendJob() throws Exception {
+    void eseguiJobEndpointAlsoTriggersRtSendJob() {
         controller.eseguiJobEndpoint(false);
 
         // executeIfPossible(rtSendJob, "rtSendJob") gira async sul ForkJoinPool.commonPool().
@@ -155,15 +153,18 @@ class BatchControllerTest {
 
     @Test
     @DisplayName("eseguiJobEndpoint NON avvia rtSendJob se govpay.batch.rt-send.enabled=false")
-    void eseguiJobEndpointSkipsRtSendJobWhenDisabled() throws Exception {
+    void eseguiJobEndpointSkipsRtSendJobWhenDisabled() {
         BatchController disabledController = buildController(false);
 
         disabledController.eseguiJobEndpoint(false);
 
-        // Diamo tempo a un eventuale runAsync di partire (max ~1s) per essere sicuri che NON parta.
-        Thread.sleep(500);
-        org.mockito.Mockito.verify(jobExecutionHelper, org.mockito.Mockito.never())
-                .executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME);
+        // Il job non deve partire: verifichiamo che la condizione "mai invocato" resti
+        // vera per mezzo secondo, il tempo entro cui un eventuale runAsync partirebbe.
+        org.awaitility.Awaitility.await()
+                .during(java.time.Duration.ofMillis(500))
+                .atMost(java.time.Duration.ofSeconds(2))
+                .untilAsserted(() -> org.mockito.Mockito.verify(jobExecutionHelper, org.mockito.Mockito.never())
+                        .executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME));
     }
 
     @Test

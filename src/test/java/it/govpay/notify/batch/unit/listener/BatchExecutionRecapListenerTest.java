@@ -3,7 +3,9 @@ package it.govpay.notify.batch.unit.listener;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +30,7 @@ class BatchExecutionRecapListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new BatchExecutionRecapListener();
+        listener = new BatchExecutionRecapListener(Clock.system(ZoneId.of("Europe/Rome")));
     }
 
     @Nested
@@ -64,6 +66,16 @@ class BatchExecutionRecapListenerTest {
             when(jobExecution.getStartTime()).thenReturn(LocalDateTime.now().minusSeconds(5));
             when(jobExecution.getEndTime()).thenReturn(LocalDateTime.now());
             when(jobExecution.getStatus()).thenReturn(BatchStatus.FAILED);
+
+            assertDoesNotThrow(() -> listener.afterJob(jobExecution));
+        }
+
+        @Test
+        @DisplayName("should not fail when start/end time are not available")
+        void shouldNotFailWithoutTimestamps() {
+            when(jobExecution.getStartTime()).thenReturn(null);
+            when(jobExecution.getEndTime()).thenReturn(null);
+            when(jobExecution.getStatus()).thenReturn(BatchStatus.STARTING);
 
             assertDoesNotThrow(() -> listener.afterJob(jobExecution));
         }

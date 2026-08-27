@@ -2,6 +2,7 @@ package it.govpay.notify.batch.rt.service;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -92,7 +93,12 @@ public class EnteRicevutaApiService {
     }
 
     private Map<String, String> getConnettoreAsMapIsolated(String codConnettore) {
-        return txNotSupported.execute(status -> connettoreService.getConnettoreAsMap(codConnettore));
+        // requireNonNullElse: TransactionTemplate.execute puo' restituire null solo se
+        // lo fa il callback; normalizzando qui a mappa vuota il chiamante ha un solo
+        // caso da gestire ("connettore non configurato") invece di due equivalenti.
+        return Objects.requireNonNullElse(
+                txNotSupported.execute(status -> connettoreService.getConnettoreAsMap(codConnettore)),
+                Map.of());
     }
 
     /**
@@ -155,7 +161,7 @@ public class EnteRicevutaApiService {
      */
     private void verificaVersioneSupportata(String codConnettore) {
         Map<String, String> props = getConnettoreAsMapIsolated(codConnettore);
-        if (props == null || props.isEmpty()) {
+        if (props.isEmpty()) {
             throw new IllegalStateException(
                     "Connettore non configurato: " + codConnettore);
         }

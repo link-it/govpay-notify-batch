@@ -16,12 +16,12 @@ import it.govpay.notify.batch.Costanti;
  * <p>
  * Migrato a Jackson 3 (tools.jackson): SerializerProvider e' stato rinominato
  * SerializationContext, IOException e' stata sostituita da JacksonException.
+ * In Jackson 3 i serializer non sono piu' {@link java.io.Serializable}, quindi
+ * non servono ne' serialVersionUID ne' il modificatore transient sui campi.
  */
 public class OffsetDateTimeSerializer extends StdScalarSerializer<OffsetDateTime> {
 
-	private static final long serialVersionUID = 1L;
-
-	private transient DateTimeFormatter formatter;
+	private final DateTimeFormatter formatter;
 
 	/**
 	 * Default constructor using standard timestamp format with timezone.

@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.time.Clock;
+import java.time.ZoneId;
 import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +40,7 @@ class RtNotifyProcessorTest {
 
     @BeforeEach
     void setUp() {
-        processor = new RtNotifyProcessor(enteApiService);
+        processor = new RtNotifyProcessor(enteApiService, Clock.system(ZoneId.of("Europe/Rome")));
 
         context = RtNotifyContext.builder()
                 .rtId(RT_ID)

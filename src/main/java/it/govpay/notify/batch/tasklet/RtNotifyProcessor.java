@@ -2,6 +2,7 @@ package it.govpay.notify.batch.tasklet;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 
@@ -22,9 +23,11 @@ public class RtNotifyProcessor implements ItemProcessor<RtNotifyContext, RtNotif
 
 
 	private final EnteApiService enteApiService;
+	private final Clock clock;
 
-	public RtNotifyProcessor(EnteApiService enteApiService) {
+	public RtNotifyProcessor(EnteApiService enteApiService, Clock clock) {
 		this.enteApiService = enteApiService;
+		this.clock = clock;
     }
 
     @Override
@@ -38,7 +41,7 @@ public class RtNotifyProcessor implements ItemProcessor<RtNotifyContext, RtNotif
         return RtNotifyBatch.builder()
                               .rtId(context.getRtId())
                               .esito(esito)
-                              .notifyTime(LocalDateTime.now())
+                              .notifyTime(LocalDateTime.now(clock))
                               .message(msg)
                               .build();
     }

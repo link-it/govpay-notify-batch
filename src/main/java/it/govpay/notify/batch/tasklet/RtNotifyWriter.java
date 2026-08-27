@@ -1,6 +1,5 @@
 package it.govpay.notify.batch.tasklet;
 
-import org.springframework.batch.core.annotation.BeforeStep;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.stereotype.Component;
@@ -21,10 +20,6 @@ public class RtNotifyWriter implements ItemWriter<RtNotifyBatch> {
 
     public RtNotifyWriter(RendicontazioniRepository rendicontazioniRepository) {
     	this.rendicontazioniRepository = rendicontazioniRepository;
-    }
-
-    @BeforeStep
-    public void beforeStep() {
     }
 
     @Override
