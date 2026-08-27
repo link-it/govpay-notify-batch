@@ -19,11 +19,10 @@ import tools.jackson.databind.deser.std.StdScalarDeserializer;
  * This is needed because pagoPA API sometimes sends datetime strings for date fields.
  * <p>
  * Migrato a Jackson 3 (tools.jackson): IOException sostituita da JacksonException
- * nella firma di deserialize.
+ * nella firma di deserialize. In Jackson 3 i deserializer non sono piu'
+ * {@link java.io.Serializable}, quindi non serve il serialVersionUID.
  */
 public class LocalDateFlexibleDeserializer extends StdScalarDeserializer<LocalDate> {
-
-    private static final long serialVersionUID = 1L;
 
     public LocalDateFlexibleDeserializer() {
         super(LocalDate.class);
