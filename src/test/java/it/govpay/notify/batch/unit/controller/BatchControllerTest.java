@@ -168,6 +168,33 @@ class BatchControllerTest {
     }
 
     @Test
+    @DisplayName("rtSendJob che fallisce all'avvio non altera la risposta HTTP del job primario")
+    void eseguiJobEndpointIsNotAffectedByRtSendJobFailure() throws Exception {
+        org.mockito.Mockito.when(jobExecutionHelper.executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME))
+                .thenThrow(new IllegalStateException("job repository non raggiungibile"));
+
+        assertNotNull(controller.eseguiJobEndpoint(false));
+
+        // Il lancio best-effort gira async: attendiamo che il tentativo sia avvenuto per
+        // verificare che l'eccezione resti confinata nel runAsync (solo log, nessuna
+        // propagazione all'endpoint).
+        org.awaitility.Awaitility.await()
+                .atMost(java.time.Duration.ofSeconds(2))
+                .untilAsserted(() -> verify(jobExecutionHelper).executeIfPossible(rtSendJob, Costanti.RT_SEND_JOB_NAME));
+    }
+
+    @Test
+    @DisplayName("getStatusEndpoint returns a non-null response")
+    void getStatusEndpointReturnsResponse() {
+        // getStatus() della superclasse interroga il servizio di concorrenza multi-nodo:
+        // senza esecuzioni in corso deve rispondere comunque, non sollevare.
+        org.mockito.Mockito.when(jobExecutionHelper.getJobConcurrencyService())
+                .thenReturn(mock(it.govpay.common.batch.service.JobConcurrencyService.class));
+
+        assertNotNull(controller.getStatusEndpoint());
+    }
+
+    @Test
     @DisplayName("getLastExecutionEndpoint returns a non-null response")
     void getLastExecutionEndpointReturnsResponse() {
         assertNotNull(controller.getLastExecutionEndpoint());

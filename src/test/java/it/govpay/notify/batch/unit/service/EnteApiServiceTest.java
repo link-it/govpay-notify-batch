@@ -37,6 +37,7 @@ import it.govpay.common.client.model.Connettore;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.common.entity.ApplicazioneEntity;
 import it.govpay.common.repository.ApplicazioneRepository;
+import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.dto.RtNotifyContext;
 import it.govpay.notify.batch.gde.service.GdeService;
@@ -285,6 +286,27 @@ class EnteApiServiceTest {
         assertNotNull(msg);
         assertTrue(msg.startsWith("Configurazione non idonea"));
         assertTrue(msg.contains("SOAP_1"));
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
+    }
+
+    @Test
+    @DisplayName("connettore configurato ma senza proprieta' VERSIONE -> segnalato come non idoneo")
+    void notifySkipsWhenVersionePropertyIsAbsent() {
+        ApplicazioneEntity ok = new ApplicazioneEntity();
+        ok.setCodApplicazione(COD_APP);
+        ok.setCodConnettoreIntegrazione(COD_CONN);
+        when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(ok));
+        Connettore connettore = Connettore.builder().idConnettore(COD_CONN).url("https://ente/api").build();
+        when(connettoreService.getConnettore(COD_CONN)).thenReturn(connettore);
+        // Map non vuota ma priva di VERSIONE: il connettore esiste, manca la sola proprieta'.
+        when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Map.of("URL", "https://ente/api"));
+        CompletableFuture<HttpStatusCode> future = new CompletableFuture<>();
+
+        String msg = service.notifyRendicontazione(rtInfo, future);
+
+        assertNotNull(msg);
+        assertTrue(msg.startsWith("Configurazione non idonea"));
+        assertTrue(msg.contains(Costanti.CONNETTORE_PROPRIETA_VERSIONE));
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, future.join());
     }
 

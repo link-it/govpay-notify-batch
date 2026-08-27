@@ -1,6 +1,8 @@
 package it.govpay.notify.batch.unit.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -23,6 +25,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import it.govpay.common.client.model.Connettore;
 import it.govpay.common.configurazione.service.ConfigurazioneService;
+import it.govpay.gde.client.beans.DettaglioRisposta;
 import it.govpay.gde.client.beans.EsitoEvento;
 import it.govpay.gde.client.beans.NuovoEvento;
 import it.govpay.notify.batch.dto.RtNotifyContext;
@@ -142,6 +145,52 @@ class GdeServiceTest {
             verify(eventoRtMapper).setParametriRichiesta(eq(mockEvento), contains("/rendicontazioni"), eq("POST"), anyList(), eq("{}"));
             verify(eventoRtMapper).setParametriRisposta(eq(mockEvento), eq(dataEnd), eq(response), isNull());
             verify(gdeRestTemplate).postForEntity(eq(GDE_ENDPOINT), eq(mockEvento), eq(Void.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("payload di risposta")
+    class ResponsePayloadTest {
+
+        @Test
+        @DisplayName("parametri di risposta gia' presenti -> il payload della response viene valorizzato")
+        void payloadIsSetWhenParametriRispostaArePresent() {
+            setupGdeEnabled();
+            ResponseEntity<String> response = ResponseEntity.ok("corpo-risposta");
+            NuovoEvento mockEvento = new NuovoEvento();
+            mockEvento.setParametriRisposta(new DettaglioRisposta());
+            // Il payload viene serializzato dall'ObjectMapper iniettato in AbstractGdeService.
+            when(objectMapper.writeValueAsString("corpo-risposta")).thenReturn("\"corpo-risposta\"");
+
+            when(eventoRtMapper.createEventoOk(eq(rtInfo), anyString(), anyString(), eq(dataStart), eq(dataEnd)))
+                    .thenReturn(mockEvento);
+
+            gdeService.saveNotifyRndOk(rtInfo, "{}", response, dataStart, dataEnd, ENTE_BASE_URL);
+
+            // Il GDE vuole il payload in base64 (cfr. GdeUtils.extractResponsePayload).
+            String atteso = java.util.Base64.getEncoder()
+                    .encodeToString("\"corpo-risposta\"".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            assertEquals(atteso, mockEvento.getParametriRisposta().getPayload());
+        }
+    }
+
+    @Nested
+    @DisplayName("pattern GdeEventInfo non supportato")
+    class UnsupportedGdeEventInfoTest {
+
+        /**
+         * GdeService invia gli eventi con sendEventAsync(NuovoEvento), non con il
+         * pattern a GdeEventInfo di AbstractGdeService: i due hook della superclasse
+         * sono implementati per contratto e devono restare inutilizzabili, cosi' che
+         * un uso accidentale emerga subito invece di produrre eventi vuoti.
+         */
+        @Test
+        @DisplayName("convertToGdeEvent e getConfigurazioneComponente sollevano UnsupportedOperationException")
+        void gdeEventInfoHooksAreNotSupported() {
+            assertThrows(UnsupportedOperationException.class, () -> org.springframework.test.util.ReflectionTestUtils
+                    .invokeMethod(gdeService, "convertToGdeEvent", (Object) null));
+            assertThrows(UnsupportedOperationException.class, () -> org.springframework.test.util.ReflectionTestUtils
+                    .invokeMethod(gdeService, "getConfigurazioneComponente", null, null));
         }
     }
 
