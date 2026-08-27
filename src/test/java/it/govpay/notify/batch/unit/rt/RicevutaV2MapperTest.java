@@ -105,6 +105,29 @@ class RicevutaV2MapperTest {
     }
 
     @Test
+    @DisplayName("data messaggio ricevuta assente -> data e dataPagamento non valorizzate")
+    void dataMsgRicevutaAssente() {
+        Rpt rpt = baseRpt();
+        rpt.setDataMsgRicevuta(null);
+
+        Ricevuta r = mapper.toRicevuta(rpt);
+
+        assertNull(r.getData());
+        assertNull(r.getDataPagamento());
+    }
+
+    @Test
+    @DisplayName("codice esito pagamento assente -> esito non valorizzato")
+    void codEsitoPagamentoAssente() {
+        Rpt rpt = baseRpt();
+        rpt.setCodEsitoPagamento(null);
+
+        Ricevuta r = mapper.toRicevuta(rpt);
+
+        assertNull(r.getEsito());
+    }
+
+    @Test
     @DisplayName("codice esito non riconosciuto solleva IllegalArgumentException")
     void unknownEsito() {
         Rpt rpt = baseRpt();

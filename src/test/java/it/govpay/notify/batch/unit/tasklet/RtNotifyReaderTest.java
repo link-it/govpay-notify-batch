@@ -350,4 +350,92 @@ class RtNotifyReaderTest {
             assertTrue(ex.getMessage().contains("OffsetDateTime"));
         }
     }
+
+    @Nested
+    @DisplayName("conversione dei tipi numerici del ResultSet")
+    class NumericConvertersTest {
+
+        /**
+         * I tipi restituiti dal driver JDBC per le colonne numeriche variano con il
+         * database (Long su PostgreSQL, BigInteger su MySQL, Double sui vecchi
+         * dialetti): i convertitori del reader devono accettarli tutti, altrimenti
+         * il beforeStep aborta l'intero job.
+         */
+        @Test
+        @DisplayName("BigInteger e Double dal driver JDBC sono accettati per indice/importo/esito")
+        void acceptsBigIntegerAndDoubleFromDriver() {
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[4] = BigInteger.valueOf(3);      // indice
+            row[5] = 250.75d;                    // importo
+            row[6] = BigInteger.valueOf(9);      // esito
+            row[16] = BigInteger.valueOf(2);     // revisione
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any()))
+                    .thenReturn(List.<Object[]>of(row));
+
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
+            reader.initToBeNotify();
+            RtNotifyContext ctx = reader.read();
+
+            assertEquals(3, ctx.getIndice());
+            assertEquals(9, ctx.getEsito());
+            assertEquals(2, ctx.getRevisione());
+            assertEquals(0, BigDecimal.valueOf(250.75d).compareTo(ctx.getImporto()));
+        }
+
+        @Test
+        @DisplayName("BigInteger sull'importo viene convertito in BigDecimal")
+        void convertsBigIntegerAmount() {
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[5] = BigInteger.valueOf(1500);
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any()))
+                    .thenReturn(List.<Object[]>of(row));
+
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
+            reader.initToBeNotify();
+
+            assertEquals(0, BigDecimal.valueOf(1500d).compareTo(reader.read().getImporto()));
+        }
+
+        @Test
+        @DisplayName("BigDecimal sull'importo passa invariato")
+        void keepsBigDecimalAsIs() {
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[5] = new BigDecimal("42.42");
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any()))
+                    .thenReturn(List.<Object[]>of(row));
+
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
+            reader.initToBeNotify();
+
+            assertEquals(new BigDecimal("42.42"), reader.read().getImporto());
+        }
+
+        @Test
+        @DisplayName("tipo non convertibile -> IllegalArgumentException con la classe incriminata nel messaggio")
+        void rejectsUnsupportedTypeOnInteger() {
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[4] = "non-un-numero";
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any()))
+                    .thenReturn(List.<Object[]>of(row));
+
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
+
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, reader::initToBeNotify);
+            assertTrue(ex.getMessage().contains("java.lang.String"));
+        }
+
+        @Test
+        @DisplayName("tipo non convertibile sull'importo -> IllegalArgumentException")
+        void rejectsUnsupportedTypeOnBigDecimal() {
+            Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
+            row[5] = "non-un-importo";
+            when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any()))
+                    .thenReturn(List.<Object[]>of(row));
+
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
+
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, reader::initToBeNotify);
+            assertTrue(ex.getMessage().contains("big decimal"));
+        }
+    }
 }

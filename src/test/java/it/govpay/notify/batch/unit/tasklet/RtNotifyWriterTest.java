@@ -75,6 +75,30 @@ class RtNotifyWriterTest {
         }
 
         @Test
+        @DisplayName("esito null -> nessuna registrazione, nessun NPE")
+        void shouldNotRegisterWhenEsitoIsNull() {
+            RtNotifyBatch batch = RtNotifyBatch.builder().rtId(10L).esito(null).build();
+
+            assertDoesNotThrow(() -> writer.write(new Chunk<>(Arrays.asList(batch))));
+
+            verifyNoInteractions(rendicontazioniRepository);
+        }
+
+        @Test
+        @DisplayName("item con notifyTime valorizzato -> registrato, il timestamp non altera l'esito")
+        void shouldRegisterItemWithNotifyTime() {
+            RtNotifyBatch batch = RtNotifyBatch.builder()
+                    .rtId(10L)
+                    .esito("OK")
+                    .notifyTime(java.time.LocalDateTime.of(2026, 3, 10, 12, 0))
+                    .build();
+
+            writer.write(new Chunk<>(Arrays.asList(batch)));
+
+            verify(rendicontazioniRepository).registerNotificaRt(10L);
+        }
+
+        @Test
         @DisplayName("should handle empty chunk without exceptions")
         void shouldHandleEmptyChunk() throws Exception {
             assertDoesNotThrow(() -> writer.write(new Chunk<>(Collections.emptyList())));

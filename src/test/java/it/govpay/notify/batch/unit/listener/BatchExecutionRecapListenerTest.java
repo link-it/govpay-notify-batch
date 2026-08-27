@@ -81,6 +81,16 @@ class BatchExecutionRecapListenerTest {
         }
 
         @Test
+        @DisplayName("should not fail when only the end time is missing (job interrotto)")
+        void shouldNotFailWithoutEndTime() {
+            when(jobExecution.getStartTime()).thenReturn(LocalDateTime.of(2026, 3, 10, 12, 0));
+            when(jobExecution.getEndTime()).thenReturn(null);
+            when(jobExecution.getStatus()).thenReturn(BatchStatus.STOPPED);
+
+            assertDoesNotThrow(() -> listener.afterJob(jobExecution));
+        }
+
+        @Test
         @DisplayName("should calculate duration correctly")
         void shouldCalculateDurationCorrectly() {
             LocalDateTime start = LocalDateTime.of(2024, 1, 15, 10, 0, 0);

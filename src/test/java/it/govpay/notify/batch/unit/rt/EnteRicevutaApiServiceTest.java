@@ -80,6 +80,18 @@ class EnteRicevutaApiServiceTest {
     }
 
     @Test
+    @DisplayName("codConnettoreIntegrazione valorizzato con spazi -> IllegalStateException come se fosse assente")
+    void connectorCodeBlank() {
+        when(applicazioneRepository.findByCodApplicazione("APP1"))
+                .thenReturn(Optional.of(ApplicazioneEntity.builder()
+                        .codApplicazione("APP1")
+                        .codConnettoreIntegrazione("   ")
+                        .build()));
+        assertThrows(IllegalStateException.class,
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+    }
+
+    @Test
     @DisplayName("connettore non configurato (map vuota) -> IllegalStateException")
     void connectorPropsEmpty() {
         when(applicazioneRepository.findByCodApplicazione("APP1"))

@@ -117,4 +117,21 @@ class OffsetDateTimeDeserializerTest {
 
         assertThrows(DateTimeParseException.class, () -> deserializer.deserialize(parser, null));
     }
+
+    @Test
+    @DisplayName("formato custom senza timezone -> quarto fallback: parsing come LocalDateTime con offset CET")
+    void customPatternWithoutOffsetFallsBackToLocalDateTime() {
+        // Nessuno dei primi tre tentativi riconosce questa stringa: il primo e il secondo
+        // richiedono l'offset, il terzo il formato ISO. Resta il quarto, che rilegge il
+        // valore come LocalDateTime con il pattern del costruttore e applica CET.
+        OffsetDateTimeDeserializer custom = new OffsetDateTimeDeserializer("yyyy/MM/dd HH:mm:ss");
+
+        OffsetDateTime result = custom.parseOffsetDateTime("2025/03/12 10:00:00",
+                DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"));
+
+        assertNotNull(result);
+        assertEquals(2025, result.getYear());
+        assertEquals(10, result.getHour());
+        assertEquals(ZoneOffset.ofHours(1), result.getOffset());
+    }
 }

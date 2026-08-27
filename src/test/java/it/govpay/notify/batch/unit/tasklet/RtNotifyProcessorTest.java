@@ -100,6 +100,43 @@ class RtNotifyProcessorTest {
         }
 
         @Test
+        @DisplayName("4xx dall'ente -> esito OK: la notifica e' stata recapitata, il rifiuto e' di merito")
+        void shouldTreatClientErrorAsDelivered() throws Exception {
+            doAnswer(invocation -> {
+                invocation.<CompletableFuture<HttpStatusCode>>getArgument(1).complete(HttpStatus.BAD_REQUEST);
+                return "Notifica errata";
+            }).when(enteApiService).notifyRendicontazione(eq(context), any(CompletableFuture.class));
+
+            RtNotifyBatch result = processor.process(context);
+
+            assertEquals("OK", result.getEsito());
+        }
+
+        @Test
+        @DisplayName("5xx dall'ente -> esito KO: la notifica va ritentata")
+        void shouldTreatServerErrorAsRetriable() throws Exception {
+            doAnswer(invocation -> {
+                invocation.<CompletableFuture<HttpStatusCode>>getArgument(1).complete(HttpStatus.INTERNAL_SERVER_ERROR);
+                return "Internal error";
+            }).when(enteApiService).notifyRendicontazione(eq(context), any(CompletableFuture.class));
+
+            RtNotifyBatch result = processor.process(context);
+
+            assertEquals("KO", result.getEsito());
+        }
+
+        @Test
+        @DisplayName("future mai completato (nessuna interazione HTTP) -> esito KO")
+        void shouldTreatIncompleteFutureAsKo() throws Exception {
+            when(enteApiService.notifyRendicontazione(eq(context), any(CompletableFuture.class)))
+                    .thenReturn("Configurazione non idonea: connettore assente");
+
+            RtNotifyBatch result = processor.process(context);
+
+            assertEquals("KO", result.getEsito());
+        }
+
+        @Test
         @DisplayName("should propagate exception when service throws")
         void shouldPropagateExceptionWhenServiceThrows() throws Exception {
             when(enteApiService.notifyRendicontazione(eq(context), any(CompletableFuture.class)))

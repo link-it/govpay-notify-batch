@@ -1,5 +1,28 @@
 2026-08-27  Giuliano Pintori <pintori@link.it>
 
+	* [Test]
+	Copertura sul nuovo codice portata dal 78,7% (sotto la soglia dell'80% del Quality Gate "Sonar way") al 99,7% misurato in locale con JaCoCo: gli elementi scoperti nel perimetro analizzato da SonarCloud passano da 197 a 3. La suite cresce da 141 a 196 test. Nessuna modifica al codice di produzione: sono stati aggiunti solo test.
+
+	* [Test]
+	RtSendReader: nuova classe RtSendReaderTest. Il reader era il caso piu' anomalo del report (3,2% di copertura, 24 righe e 6 condizioni scoperte) pur essendo l'ingresso del job di spedizione RT. I test coprono i filtri della query (RICEVUTA / DA_SPEDIRE / data di scadenza presa dal Clock / PageRequest di pageSize), la coda vuota, lo svuotamento in ordine del buffer, il caricamento una sola volta per esecuzione e il reset del buffer fatto da init() con @BeforeStep: senza quel reset una seconda esecuzione dello step nello stesso contesto leggerebbe un buffer gia' consumato.
+
+	* [Test]
+	EnteApiService: nuova classe EnteApiServiceHttpTest, che esercita l'interazione HTTP end-to-end sul client OpenAPI generato tramite MockRestServiceServer (RestTemplate reale, quindi il test attraversa serializzazione JSON, costruzione dell'URL e mapping degli status code come in produzione). Copre il percorso 200 con verifica del payload inviato, i quattro rami di errore HTTP (400/401/403/500) con il rispettivo messaggio ed evento KO al GDE, la mappatura dei cinque codici esito sull'enum dell'API EC, il codice esito non riconosciuto (respinto prima di qualsiasi chiamata), il fallimento di serializzazione del payload e il caching dell'istanza API per connettore. Il file passa dal 47,4% al 99,4%: era il maggior contributore singolo al debito di copertura (73 righe scoperte su 157).
+
+	* [Test]
+	EnteRicevutaApiService: nuova classe EnteRicevutaApiServiceHttpTest con lo stesso impianto. Copre la PUT su /ricevute/{idDominio}/{iuv}/{idRicevuta}, il caching per connettore, l'applicazione dei timeout su SimpleClientHttpRequestFactory (verificata sui valori effettivamente scritti sulla factory) e il caso complementare, in cui una factory non gestita - tipicamente quella con configurazione SSL/mTLS costruita da govpay-common - viene lasciata invariata. Aggiunto in EnteRicevutaApiServiceTest il caso di codConnettoreIntegrazione valorizzato con soli spazi. Il file passa dal 46,7% al 100%.
+
+	* [Test]
+	RtSendScheduledJobRunner e BatchInfraConfig: nuove classi RtSendScheduledJobRunnerTest e BatchInfraConfigTest. Il runner era a copertura zero perche' e' @ConditionalOnProperty su govpay.batch.rt-send.enabled e non viene istanziato nei test di contesto: i test verificano il cablaggio e le due decisioni del dispatcher multi-nodo (nodo libero -> avvio come esecuzione SCHEDULED; job gia' in corso altrove -> nessun avvio). BatchInfraConfigTest copre i tre bean infrastrutturali, il cui mancato cablaggio si manifesterebbe come fallimento di startup dell'applicazione.
+
+	* [Test]
+	Completati i rami residui sui file gia' in buona copertura, scegliendo casi che fissano comportamenti di merito e non solo righe: la regola per cui un 4xx dall'ente vale esito OK (la notifica e' stata recapitata, il rifiuto e' di merito) mentre un 5xx vale KO e va ritentata (RtNotifyProcessor); il troncamento della descrizione al limite di 255 caratteri della colonna descrizione_stato, incluso il caso di eccezione senza messaggio (RtSendProcessor); i tipi numerici che i vari driver JDBC restituiscono per le stesse colonne - Long, BigInteger, Double, BigDecimal - e il rifiuto dei tipi non convertibili (RtNotifyReader); l'esito derivato dalla sola response senza eccezione e l'eccezione HTTP priva di header di risposta (EventoRtMapper); il payload di risposta in base64 e i due hook GdeEventInfo deliberatamente non supportati (GdeService); date ed esiti assenti sull'RPT (RicevutaV2Mapper); il quarto fallback di parsing con formatter custom senza offset (OffsetDateTimeDeserializer); il connettore con proprieta' VERSIONE assente (EnteApiService); il fallimento del lancio best-effort di rtSendJob, che non deve alterare la risposta HTTP dell'endpoint (BatchController).
+
+	* [Test]
+	Restano scoperte tre condizioni, tutte irraggiungibili da codice Java e lasciate deliberatamente tali: il ramo default sintetico generato dal compilatore per lo switch esaustivo su RtSendOutcome (RtSendStatusUpdater) e le due guardie "value non vuoto" sugli header HTTP (EventoRtMapper), che l'API HttpHeaders non consente di violare.
+
+2026-08-27  Giuliano Pintori <pintori@link.it>
+
 	* [Fix]
 	RtSendWriter: la propagazione REQUIRES_NEW dichiarata su applyUpdate era di fatto inefficace. Il metodo annotato era nella stessa classe del writer e veniva invocato via this da write(...): l'auto-invocazione non attraversa il proxy transazionale di Spring, quindi l'annotazione veniva ignorata e gli update di stato delle notifiche finivano nella transazione del chunk invece che una per item. Il metodo e' stato estratto nel nuovo bean RtSendStatusUpdater (rt/tasklet), che il writer riceve per iniezione: ora la chiamata passa per il proxy e la transazione per item viene realmente aperta. ATTENZIONE, e' un cambio di semantica reale su rtSendJob: se un item fallisce, gli update dei precedenti restano committati (comportamento dichiarato dal javadoc originale e allineato a NotificheBD del monolite, ma diverso da quello effettivo fino a questa versione). Segnalazione SonarCloud Blocker su Reliability piu' la High correlata "Call transactional methods via an injected dependency instead of directly via 'this'": stesso difetto di design, risolto in un unico intervento.
 

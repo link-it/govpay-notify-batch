@@ -181,6 +181,36 @@ class EventoRtMapperTest {
         }
 
         @Test
+        @DisplayName("response 4xx senza eccezione -> esito KO derivato dallo status")
+        void shouldDeriveKoEsitoFromResponseWithoutException() {
+            NuovoEvento evento = mapper.createEventoKo(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, dataEnd,
+                    ResponseEntity.status(HttpStatus.CONFLICT).build(), null);
+
+            assertEquals(EsitoEvento.KO, evento.getEsito());
+            assertEquals("409", evento.getSottotipoEsito());
+        }
+
+        @Test
+        @DisplayName("response 5xx senza eccezione -> esito FAIL derivato dallo status")
+        void shouldDeriveFailEsitoFromResponseWithoutException() {
+            NuovoEvento evento = mapper.createEventoKo(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, dataEnd,
+                    ResponseEntity.status(HttpStatus.BAD_GATEWAY).build(), null);
+
+            assertEquals(EsitoEvento.FAIL, evento.getEsito());
+            assertEquals("502", evento.getSottotipoEsito());
+        }
+
+        @Test
+        @DisplayName("ne' response ne' eccezione -> evento creato, esito non derivabile e lasciato invariato")
+        void shouldLeaveEsitoUntouchedWhenNothingToDerive() {
+            NuovoEvento evento = mapper.createEventoKo(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, dataEnd,
+                    null, null);
+
+            assertNotNull(evento);
+            assertNull(evento.getSottotipoEsito());
+        }
+
+        @Test
         @DisplayName("should set FAIL esito for non-HTTP exceptions")
         void shouldSetFailEsitoForNonHttpExceptions() {
             RestClientException exception = new RestClientException("Connection refused");
@@ -244,6 +274,19 @@ class EventoRtMapperTest {
 
             assertNotNull(evento.getParametriRisposta());
             assertEquals(BigDecimal.valueOf(404), evento.getParametriRisposta().getStatus());
+        }
+
+        @Test
+        @DisplayName("eccezione HTTP senza header di risposta -> status valorizzato, nessun header e nessun NPE")
+        void shouldHandleHttpExceptionWithoutResponseHeaders() {
+            NuovoEvento evento = mapper.createEvento(rtInfo, TIPO_EVENTO, TRANSACTION_ID, dataStart, dataEnd);
+            // Costruttore senza header: getResponseHeaders() torna null.
+            HttpClientErrorException exception = new HttpClientErrorException(HttpStatus.GATEWAY_TIMEOUT);
+
+            mapper.setParametriRisposta(evento, dataEnd, null, exception);
+
+            assertEquals(BigDecimal.valueOf(504), evento.getParametriRisposta().getStatus());
+            assertTrue(evento.getParametriRisposta().getHeaders().isEmpty());
         }
 
         @Test
