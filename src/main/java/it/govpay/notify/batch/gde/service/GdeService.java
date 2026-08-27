@@ -105,7 +105,7 @@ public class GdeService extends AbstractGdeService {
     public void saveNotifyRndOk(RtNotifyContext rtInfo, String jsonRequest, ResponseEntity<?> responseEntity,
                                 OffsetDateTime dataStart, OffsetDateTime dataEnd, String enteBaseUrl) {
         String transactionId = UUID.randomUUID().toString();
-        String url = buildRndUrl(enteBaseUrl, rtInfo);
+        String url = buildRndUrl(enteBaseUrl);
         NuovoEvento nuovoEvento = eventoRtMapper.createEventoOk(
                 rtInfo, Costanti.PATH_NOTIFY_RND, transactionId, dataStart, dataEnd);
 
@@ -131,7 +131,7 @@ public class GdeService extends AbstractGdeService {
     public void saveNotifyRndKo(RtNotifyContext rtInfo, String jsonRequest, ResponseEntity<?> responseEntity, RestClientException exception,
                                 OffsetDateTime dataStart, OffsetDateTime dataEnd, String enteBaseUrl) {
         String transactionId = UUID.randomUUID().toString();
-        String url = buildRndUrl(enteBaseUrl, rtInfo);
+        String url = buildRndUrl(enteBaseUrl);
         NuovoEvento nuovoEvento = eventoRtMapper.createEventoKo(
                 rtInfo, Costanti.PATH_NOTIFY_RND, transactionId, dataStart, dataEnd, null, exception);
 
@@ -156,8 +156,12 @@ public class GdeService extends AbstractGdeService {
 
     /**
      * Builds the URL for notify operations using GdeUtils.buildUrl().
+     * <p>
+     * L'endpoint di notifica delle rendicontazioni non ha path/query parameter:
+     * l'URL dipende solo dal base URL del connettore, per questo non serve il
+     * {@link RtNotifyContext}.
      */
-    private String buildRndUrl(String enteBaseUrl, RtNotifyContext rtInfo) {
+    private String buildRndUrl(String enteBaseUrl) {
         return GdeUtils.buildUrl(enteBaseUrl, Costanti.PATH_NOTIFY_RND, null, null);
     }
 }

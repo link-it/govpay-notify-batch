@@ -53,8 +53,11 @@ public class RtSendJobConfiguration {
             RtSendReader rtSendReader,
             RtSendProcessor rtSendProcessor,
             RtSendWriter rtSendWriter) {
+        // chunk(size).transactionManager(tm): la variante chunk(size, tm) e' deprecata
+        // per la rimozione in Spring Batch 6.
         return new StepBuilder("rtSendStep", jobRepository)
-                .<NotificaContext, RtSendResult>chunk(chunkSize, transactionManager)
+                .<NotificaContext, RtSendResult>chunk(chunkSize)
+                .transactionManager(transactionManager)
                 .reader(rtSendReader)
                 .processor(rtSendProcessor)
                 .writer(rtSendWriter)

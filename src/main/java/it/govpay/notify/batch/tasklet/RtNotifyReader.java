@@ -2,6 +2,7 @@ package it.govpay.notify.batch.tasklet;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -28,21 +29,24 @@ import lombok.extern.slf4j.Slf4j;
 public class RtNotifyReader implements ItemReader<RtNotifyContext>, StepExecutionListener {
 
     private final RendicontazioniRepository rndRepository;
+    private final Clock clock;
     private final int finestraTemporale;
 
     private List<RtNotifyContext> toBeNotifyList = null;
 
     public RtNotifyReader(
     		RendicontazioniRepository rndRepository,
+    		Clock clock,
     		@Value("${govpay.batch.finestra-temporale:90}") int finestraTemporale) {
         this.rndRepository = rndRepository;
+        this.clock = clock;
         this.finestraTemporale = finestraTemporale;
     }
 
     @BeforeStep
     public void initToBeNotify() {
 		toBeNotifyList = new ArrayList<>();
-		LocalDateTime dataLimite = LocalDateTime.now().minusDays(finestraTemporale);
+		LocalDateTime dataLimite = LocalDateTime.now(clock).minusDays(finestraTemporale);
 		List<Object[]> rndInfos = rndRepository.findRendicontazioneWithNoPagamentoAfterId(dataLimite);
 		log.info("Trovate {} ricevute da notificare", rndInfos.size());
 		for (Object[] rndInfo : rndInfos) {

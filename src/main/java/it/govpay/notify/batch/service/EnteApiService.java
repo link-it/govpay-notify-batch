@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,7 +95,12 @@ public class EnteApiService {
 	 * la transazione outer. Vedi {@link #txNotSupported} per il razionale.
 	 */
 	private Map<String, String> getConnettoreAsMapIsolated(String codConnettore) {
-		return txNotSupported.execute(status -> connettoreService.getConnettoreAsMap(codConnettore));
+		// requireNonNullElse: TransactionTemplate.execute puo' restituire null solo se
+		// lo fa il callback; normalizzando qui a mappa vuota il chiamante ha un solo
+		// caso da gestire ("connettore non configurato") invece di due equivalenti.
+		return Objects.requireNonNullElse(
+				txNotSupported.execute(status -> connettoreService.getConnettoreAsMap(codConnettore)),
+				Map.of());
 	}
 
 	/**
@@ -162,7 +168,7 @@ public class EnteApiService {
 	private void validateConnectorVersion(String codApplicazione) {
 		String codConnettore = resolveConnectorCode(codApplicazione);
 		Map<String, String> props = getConnettoreAsMapIsolated(codConnettore);
-		if (props == null || props.isEmpty()) {
+		if (props.isEmpty()) {
 			throw new IllegalStateException("Connettore non configurato: " + codConnettore);
 		}
 		String versione = props.get(Costanti.CONNETTORE_PROPRIETA_VERSIONE);

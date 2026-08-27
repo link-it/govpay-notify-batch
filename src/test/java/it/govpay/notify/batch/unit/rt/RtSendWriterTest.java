@@ -1,12 +1,17 @@
 package it.govpay.notify.batch.unit.rt;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,10 +22,14 @@ import org.springframework.batch.infrastructure.item.Chunk;
 import it.govpay.notify.batch.repository.NotificheRepository;
 import it.govpay.notify.batch.rt.dto.RtSendOutcome;
 import it.govpay.notify.batch.rt.dto.RtSendResult;
+import it.govpay.notify.batch.rt.tasklet.RtSendStatusUpdater;
 import it.govpay.notify.batch.rt.tasklet.RtSendWriter;
 
 @DisplayName("RtSendWriter")
 class RtSendWriterTest {
+
+    private static final ZoneId ZONE = ZoneId.of("Europe/Rome");
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 10, 12, 0, 0);
 
     private NotificheRepository repo;
     private RtSendWriter writer;
@@ -28,7 +37,9 @@ class RtSendWriterTest {
     @BeforeEach
     void setUp() {
         repo = mock(NotificheRepository.class);
-        writer = new RtSendWriter(repo);
+        // Clock fisso: le date calcolate dal writer sono deterministiche.
+        Clock clock = Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
+        writer = new RtSendWriter(new RtSendStatusUpdater(repo, clock));
     }
 
     @Test
@@ -39,9 +50,9 @@ class RtSendWriterTest {
                 .outcome(RtSendOutcome.SUCCESS)
                 .build();
 
-        writer.write(new Chunk<>(java.util.List.of(r)));
+        writer.write(new Chunk<>(List.of(r)));
 
-        verify(repo).updateSpedito(eq(10L), any(LocalDateTime.class));
+        verify(repo).updateSpedito(10L, NOW);
         verify(repo, never()).updateDaSpedire(any(), any(), any(), any(), any());
         verify(repo, never()).updateAnnullata(any(), any(), any(), any(), any());
     }
@@ -56,13 +67,12 @@ class RtSendWriterTest {
                 .tentativiSpedizione(1L)
                 .build();
 
-        writer.write(new Chunk<>(java.util.List.of(r)));
+        writer.write(new Chunk<>(List.of(r)));
 
         ArgumentCaptor<LocalDateTime> prossima = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(repo).updateAnnullata(eq(11L), eq("connettore assente"), eq(1L),
-                prossima.capture(), any(LocalDateTime.class));
-        org.junit.jupiter.api.Assertions.assertEquals(
-                LocalDateTime.of(9999, 2, 1, 0, 0), prossima.getValue());
+                prossima.capture(), eq(NOW));
+        assertEquals(LocalDateTime.of(9999, 2, 1, 0, 0), prossima.getValue());
     }
 
     @Test
@@ -75,15 +85,9 @@ class RtSendWriterTest {
                 .tentativiSpedizione(3L) // 3^2 * 60s = 540s
                 .build();
 
-        LocalDateTime before = LocalDateTime.now();
-        writer.write(new Chunk<>(java.util.List.of(r)));
+        writer.write(new Chunk<>(List.of(r)));
 
-        ArgumentCaptor<LocalDateTime> prossima = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(repo).updateDaSpedire(eq(12L), eq("HTTP 503"), eq(3L),
-                prossima.capture(), any(LocalDateTime.class));
-        long secs = java.time.Duration.between(before, prossima.getValue()).toSeconds();
-        org.junit.jupiter.api.Assertions.assertTrue(secs >= 539 && secs <= 541,
-                "atteso ~540s, ottenuto " + secs);
+        verify(repo).updateDaSpedire(12L, "HTTP 503", 3L, NOW.plusSeconds(540), NOW);
     }
 
     @Test
@@ -96,24 +100,20 @@ class RtSendWriterTest {
                 .tentativiSpedizione(1000L) // 1000^2 * 60s = 16.6 anni -> cap 24h
                 .build();
 
-        LocalDateTime before = LocalDateTime.now();
-        writer.write(new Chunk<>(java.util.List.of(r)));
+        writer.write(new Chunk<>(List.of(r)));
 
-        ArgumentCaptor<LocalDateTime> prossima = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(repo).updateDaSpedire(eq(13L), any(), eq(1000L),
-                prossima.capture(), any(LocalDateTime.class));
-        long secs = java.time.Duration.between(before, prossima.getValue()).toSeconds();
-        org.junit.jupiter.api.Assertions.assertTrue(secs <= 24L * 60 * 60 + 1,
-                "atteso <= 24h, ottenuto " + secs);
+        verify(repo).updateDaSpedire(13L, "HTTP 500", 1000L, NOW.plusSeconds(24L * 60 * 60), NOW);
     }
 
     @Test
     @DisplayName("Chunk con elementi null saltati")
     void nullsSkipped() {
-        java.util.List<RtSendResult> list = new java.util.ArrayList<>();
+        List<RtSendResult> list = new ArrayList<>();
         list.add(null);
         list.add(RtSendResult.builder().notificaId(14L).outcome(RtSendOutcome.SUCCESS).build());
+
         writer.write(new Chunk<>(list));
-        verify(repo).updateSpedito(eq(14L), any(LocalDateTime.class));
+
+        verify(repo).updateSpedito(14L, NOW);
     }
 }

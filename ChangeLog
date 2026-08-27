@@ -1,3 +1,41 @@
+2026-08-27  Giuliano Pintori <pintori@link.it>
+
+	* [Fix]
+	RtSendWriter: la propagazione REQUIRES_NEW dichiarata su applyUpdate era di fatto inefficace. Il metodo annotato era nella stessa classe del writer e veniva invocato via this da write(...): l'auto-invocazione non attraversa il proxy transazionale di Spring, quindi l'annotazione veniva ignorata e gli update di stato delle notifiche finivano nella transazione del chunk invece che una per item. Il metodo e' stato estratto nel nuovo bean RtSendStatusUpdater (rt/tasklet), che il writer riceve per iniezione: ora la chiamata passa per il proxy e la transazione per item viene realmente aperta. ATTENZIONE, e' un cambio di semantica reale su rtSendJob: se un item fallisce, gli update dei precedenti restano committati (comportamento dichiarato dal javadoc originale e allineato a NotificheBD del monolite, ma diverso da quello effettivo fino a questa versione). Segnalazione SonarCloud Blocker su Reliability piu' la High correlata "Call transactional methods via an injected dependency instead of directly via 'this'": stesso difetto di design, risolto in un unico intervento.
+
+	* [Fix]
+	BatchExecutionRecapListener: la durata dell'esecuzione era calcolata con Duration.between su due LocalDateTime, tipo che non porta con se' il fuso. I timestamp di JobExecution vengono ora ancorati al timezone applicativo e convertiti in Instant prima del calcolo, cosi' la durata resta corretta anche per run a cavallo del cambio ora legale/solare. Aggiunta anche la guardia sui due getter, che sono annotati @Nullable in Spring Batch 6: prima un JobExecution senza startTime/endTime provocava NullPointerException dentro afterJob.
+
+	* [Fix]
+	EnteApiService e EnteRicevutaApiService: nella verifica della versione del connettore la guardia "props == null || props.isEmpty()" aveva il primo operando sempre falso (TransactionTemplate.execute restituisce null solo se lo fa il callback, e getConnettoreAsMap non lo fa). Invece di rimuovere il controllo perdendo la null-safety, il valore viene normalizzato alla fonte negli helper getConnettoreAsMapIsolated con Objects.requireNonNullElse(..., Map.of()): il chiamante ha un solo caso da gestire ("connettore non configurato") e il comportamento osservabile non cambia.
+
+	* [Refactor]
+	Introdotta la convenzione mancante sull'uso dei tipi temporali. TimezoneConfig espone ora un bean Clock agganciato al timezone configurato (spring.jackson.time-zone), accanto allo ZoneId gia' presente. Lo iniettano RtSendReader, RtSendStatusUpdater, RtNotifyReader, RtNotifyProcessor e BatchExecutionRecapListener, che usano LocalDateTime.now(clock) al posto delle now() senza argomenti: il "tempo corrente" del batch ha una sorgente unica, esplicita e sostituibile nei test, invece di dipendere dal default implicito della JVM. Chiude cinque segnalazioni Info sulla stessa famiglia datetime/java8, distribuite su altrettanti file.
+
+	* [Refactor]
+	BatchJobConfiguration e RtSendJobConfiguration: sostituita la chiamata a StepBuilder.chunk(size, transactionManager), deprecata e marcata per la rimozione in Spring Batch 6, con la coppia chunk(size).transactionManager(tm) su ChunkOrientedStepBuilder. Verificato sui sorgenti di spring-batch-core 6.0.4 che il nuovo builder registra ancora reader, processor e writer come stream e listener (anche quelli annotati): il @BeforeStep di RtSendReader e RtNotifyReader continua a essere invocato, nessuna regressione sul reset del buffer fra le esecuzioni.
+
+	* [Refactor]
+	BatchController: il costruttore aveva dieci parametri, sei dei quali sono i collaboratori infrastrutturali richiesti da AbstractBatchController di govpay-common. Sono stati raggruppati nel nuovo record BatchControllerSupport (config), cablato come bean in BatchInfraConfig: nella firma del controller restano solo le dipendenze davvero sue (i due job, EnteApiService e la feature flag govpay.batch.rt-send.enabled), cinque parametri in tutto. Nessun cambio di comportamento ne' di proprieta' lette.
+
+	* [Refactor]
+	RtNotifyWriter: rimosso il metodo @BeforeStep beforeStep() vuoto. Verificato che non era un no-op intenzionale ma un hook mai implementato: nessun test lo invocava e nessun comportamento dipendeva da esso. Rimosso anziche' silenziato con un commento.
+
+	* [Refactor]
+	GdeService.buildRndUrl: rimosso il parametro rtInfo, non utilizzato. L'endpoint di notifica delle rendicontazioni non ha path ne' query parameter (GdeUtils.buildUrl viene invocata con entrambe le mappe a null), quindi l'URL dipende solo dal base URL del connettore. Il motivo e' ora documentato sul metodo per evitare che il parametro venga reintrodotto.
+
+	* [Refactor]
+	OffsetDateTimeSerializer e OffsetDateTimeDeserializer: rimosso il modificatore transient dal campo formatter e, per la stessa ragione, il serialVersionUID. In Jackson 3 (tools.jackson) ValueSerializer e ValueDeserializer non implementano piu' java.io.Serializable: entrambi erano residui della migrazione da Jackson 2 e su una classe non serializzabile non hanno alcun effetto. I campi sono ora final. Allineato anche LocalDateFlexibleDeserializer, che aveva lo stesso serialVersionUID morto pur non essendo segnalato da SonarCloud (la regola scatta sul modificatore transient, che quella classe non ha): i tre custom (de)serializer del package utils sono ora coerenti.
+
+	* [Test]
+	RtSendWriterTest riscritto sul nuovo assetto: il writer viene costruito con RtSendStatusUpdater e un Clock.fixed, quindi le due asserzioni che misuravano il backoff con Duration.between su LocalDateTime (segnalate da SonarCloud) sono sostituite da uguaglianze esatte sulle date attese. Test deterministici, non solo conformi alla regola.
+
+	* [Test]
+	BatchControllerTest: rimosso il Thread.sleep(500) usato per verificare che rtSendJob NON venga lanciato a feature flag disabilitata, sostituito con Awaitility.await().during(500ms).atMost(2s), che verifica che la condizione "mai invocato" resti vera per l'intera finestra invece di affidarsi al timing. Aggiornato il factory method del controller al nuovo BatchControllerSupport.
+
+	* [Test]
+	Aggiornati BatchExecutionRecapListenerTest, RtNotifyProcessorTest e RtNotifyReaderTest per la nuova dipendenza su Clock. Aggiunto in BatchExecutionRecapListenerTest un test per afterJob con startTime/endTime null, a copertura della guardia introdotta. Suite: 141 test, 0 failure.
+
 2026-07-25  Giuliano Pintori <pintori@link.it>
 
 	* [Build]

@@ -1,13 +1,10 @@
 package it.govpay.notify.batch.controller;
 
-import java.time.ZoneId;
 import java.util.concurrent.CompletableFuture;
 
 import org.springframework.batch.core.job.Job;
-import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,8 +17,8 @@ import it.govpay.common.batch.dto.LastExecutionInfo;
 import it.govpay.common.batch.dto.NextExecutionInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.notify.batch.Costanti;
+import it.govpay.notify.batch.config.BatchControllerSupport;
 import it.govpay.notify.batch.service.EnteApiService;
-import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -38,17 +35,13 @@ public class BatchController extends AbstractBatchController {
     private final EnteApiService enteApiService;
 
     public BatchController(
-            JobExecutionHelper jobExecutionHelper,
-            JobRepository jobRepository,
+            BatchControllerSupport support,
             @Qualifier("rtNotifyJob") Job rtNotifyJob,
             @Qualifier("rtSendJob") Job rtSendJob,
             EnteApiService enteApiService,
-            Environment environment,
-            ZoneId applicationZoneId,
-            @Value("${scheduler.rtNotifyJob.fixedDelayString:7200000}") long schedulerIntervalMillis,
-            @Value("${govpay.batch.rt-send.enabled:false}") boolean rtSendEnabled,
-            EntityManager entityManager) {
-        super(jobExecutionHelper, jobRepository, environment, applicationZoneId, schedulerIntervalMillis, entityManager);
+            @Value("${govpay.batch.rt-send.enabled:false}") boolean rtSendEnabled) {
+        super(support.jobExecutionHelper(), support.jobRepository(), support.environment(),
+                support.applicationZoneId(), support.schedulerIntervalMillis(), support.entityManager());
         this.rtNotifyJob = rtNotifyJob;
         this.rtSendJob = rtSendJob;
         this.rtSendEnabled = rtSendEnabled;

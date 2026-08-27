@@ -6,8 +6,10 @@ import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +32,7 @@ class RtNotifyReaderTest {
     @Mock
     private RendicontazioniRepository rndRepository;
 
+    private static final Clock CLOCK = Clock.system(ZoneId.of("Europe/Rome"));
     private static final int FINESTRA_TEMPORALE = 30;
     private static final String TAX_CODE_1 = "12345678901";
     private static final String TAX_CODE_2 = "98765432101";
@@ -69,7 +72,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should query repository with dataLimite")
         void shouldQueryRepositoryWithDataLimite() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
             when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
                     .thenReturn(Collections.emptyList());
 
@@ -81,7 +84,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should populate list with results from repository using Long ids")
         void shouldPopulateListWithResultsUsingLongIds() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             List<Object[]> results = new ArrayList<>();
             results.add(buildRow(1L, TAX_CODE_1, IUV_1, IUR_1));
@@ -109,7 +112,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should handle BigInteger ids from repository")
         void shouldHandleBigIntegerIdsFromRepository() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[0] = BigInteger.valueOf(999L);
@@ -128,7 +131,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should convert LocalDateTime fields to OffsetDateTime")
         void shouldConvertLocalDateTimeToOffsetDateTime() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             List<Object[]> results = new ArrayList<>();
             results.add(buildRow(1L, TAX_CODE_1, IUV_1, IUR_1));
@@ -148,7 +151,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should accept OffsetDateTime fields directly")
         void shouldAcceptOffsetDateTimeFieldsDirectly() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             OffsetDateTime now = OffsetDateTime.now();
@@ -176,7 +179,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should return items in order and null when exhausted")
         void shouldReturnItemsInOrderAndNullWhenExhausted() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             List<Object[]> results = new ArrayList<>();
             results.add(buildRow(1L, TAX_CODE_1, IUV_1, IUR_1));
@@ -194,7 +197,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should return null immediately when no items")
         void shouldReturnNullImmediatelyWhenNoItems() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
             when(rndRepository.findRendicontazioneWithNoPagamentoAfterId(any(LocalDateTime.class)))
                     .thenReturn(Collections.emptyList());
 
@@ -211,7 +214,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("should throw IllegalArgumentException for unsupported id types")
         void shouldThrowForUnsupportedIdTypes() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[0] = Integer.valueOf(1); // unsupported type
@@ -238,7 +241,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("date null nella riga NON fanno esplodere il reader")
         void nullOptionalDatesDoNotThrow() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[7] = null;   // r.data
@@ -267,7 +270,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("importo null nella riga -> RtNotifyContext.importo == null")
         void nullBigDecimalIsPropagated() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[5] = null; // r.importoPagato
@@ -286,7 +289,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("id null (r.id) viene propagato come null da convertToLong")
         void nullIdIsPropagated() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[0] = null;
@@ -309,7 +312,7 @@ class RtNotifyReaderTest {
             // proprio per evitare NPE da auto-unboxing nel builder Lombok quando convertToInteger
             // ritorna null (colonne che nel legacy possono essere NULL, in particolare fr.revisione).
             // Se in futuro qualcuno reintroduce un primitivo int, questo test fallisce.
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[4] = null;   // r.indiceDati
@@ -332,7 +335,7 @@ class RtNotifyReaderTest {
         @Test
         @DisplayName("un tipo non supportato continua a sollevare IllegalArgumentException, senza NPE")
         void unsupportedTypeStillThrowsIllegalArgument() {
-            RtNotifyReader reader = new RtNotifyReader(rndRepository, FINESTRA_TEMPORALE);
+            RtNotifyReader reader = new RtNotifyReader(rndRepository, CLOCK, FINESTRA_TEMPORALE);
 
             Object[] row = buildRow(1L, TAX_CODE_1, IUV_1, IUR_1);
             row[7] = "not-a-date"; // tipo non supportato per convertToOffsetDateTime
