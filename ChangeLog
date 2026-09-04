@@ -1,3 +1,36 @@
+2026-09-04  Giuliano Pintori <pintori@link.it>
+
+	* [Dependencies]
+	Bump di govpay-bom (parent) dalla 2.0.4-SNAPSHOT alla 2.0.5-SNAPSHOT.
+	Il progetto restava su tomcat-embed-core 11.0.22, la versione managed da
+	spring-boot-dependencies 4.1.0: il BOM 2.0.4 non conteneva alcun
+	riferimento a Tomcat, quindi non c'era nulla che sovrascrivesse quel
+	valore. L'override e' stato introdotto nel BOM 2.0.5, che imposta la
+	property tomcat.version a 11.0.25 e aggiunge le entry esplicite in
+	dependencyManagement per tomcat-embed-core/el/websocket/jasper,
+	tomcat-annotations-api e tomcat-jdbc: le entry servono perche' la sola
+	property non basta, dato che spring-boot-dependencies e' importato con
+	scope import e i suoi placeholder si risolvono nel contesto del BOM
+	importato, non in quello del progetto che lo importa.
+	tomcat-embed-core, tomcat-embed-el e tomcat-embed-websocket passano
+	quindi dalla 11.0.22 alla 11.0.25, chiudendo 9 CVE: CVE-2026-53404,
+	CVE-2026-53434, CVE-2026-50229, CVE-2026-55276, CVE-2026-55955 e
+	CVE-2026-55956 (fixed in 11.0.23), CVE-2026-59083 e CVE-2026-59084
+	(11.0.24), CVE-2026-66299 (11.0.25).
+	Il bump del parent porta anche il resto del nuovo BOM. Aggiornamenti
+	transitivi, tutti bump di versione senza artifact aggiunti o rimossi:
+	Spring Boot 4.1.0 -> 4.1.1, Spring Framework 7.0.8 -> 7.0.9,
+	Spring Data 4.1.0 -> 4.1.1, Spring Batch 6.0.4 -> 6.0.5,
+	Hibernate ORM 7.4.5.Final -> 7.4.7.Final, Hibernate Validator
+	9.1.0.Final -> 9.1.3.Final, Logback 1.5.38 -> 1.6.3, Micrometer
+	1.17.0 -> 1.17.1, Prometheus metrics 1.5.1 -> 1.7.0, Reactor
+	3.8.6 -> 3.8.7, reactor-netty 1.3.6 -> 1.3.7, Byte Buddy
+	1.18.10 -> 1.18.11, protobuf-java 4.34.2 -> 4.35.1.
+	Nessuna modifica al codice: suite invariata a 196 test, 0 failure.
+	Da tenere presente il salto minor di Logback (1.5 -> 1.6), che i test
+	non evidenziano ma che vale un controllo sulle configurazioni logback
+	custom degli ambienti di esercizio.
+
 2026-09-03  Giuliano Pintori <pintori@link.it>
 
 	* [Build]
