@@ -1,5 +1,21 @@
 2026-09-14  Giuliano Pintori <pintori@link.it>
 
+	* [Docker]
+	Rimossa da init_notify_db.sh l'esecuzione di /tmp/notify_sql/create-db.sql, un file
+	che non e' mai esistito in questo repository: era un residuo del template
+	condiviso fra i batch e faceva fallire l'inizializzazione del database.
+
+	Qui non serve alcun DDL applicativo: le entity JPA mappano tabelle del
+	database GovPay (NOTIFICHE, VERSAMENTI, RPT, FR), create da GovPay stesso. Il
+	container deve creare solo i metadati di Spring Batch.
+
+	Il difetto non era emerso perche' l'inizializzazione e' disattivata di default
+	e il job docker gira solo sui tag.
+
+	Verificato costruendo l'immagine e avviandola contro PostgreSQL 16:
+	l'inizializzazione completa e crea le 6 tabelle batch con le 3 sequence.
+2026-09-14  Giuliano Pintori <pintori@link.it>
+
 	* [DDL]
 	Gli schemi dei metadati Spring Batch non sono piu' mantenuti in questo
 	repository. Rimossi gli schemi tenuti a mano
