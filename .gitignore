@@ -31,3 +31,5 @@ docker/buildcontext/
 # Note di release locali, non tracciate
 RELEASE_NOTES.md
 
+# Report di docker/scan_image.sh
+image-scan-report/
