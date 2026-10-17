@@ -28,6 +28,11 @@ import jakarta.persistence.PersistenceContext;
 @DisplayName("RendicontazioniRepository Integration Test")
 class RendicontazioniRepositoryTest {
 
+    // id_utenza e' obbligatorio e univoco da govpay-common 5a4bfea: ogni
+    // applicazione salvata in un test ne riceve uno diverso (JUnit ricrea
+    // l'istanza per ogni test, quindi il contatore riparte da 1).
+    private long prossimaIdUtenza = 1;
+
     @Autowired
     private RendicontazioniRepository rendicontazioniRepository;
 
@@ -116,6 +121,7 @@ class RendicontazioniRepositoryTest {
                 .autoIuv(false)
                 .firmaRicevuta(FIRMA_RICEVUTA)
                 .trusted(false)
+                .idUtenza(prossimaIdUtenza++)
                 .build();
         entityManager.persist(app);
         Applicazione applicazione = entityManager.find(Applicazione.class, app.getId());
@@ -218,6 +224,7 @@ class RendicontazioniRepositoryTest {
                 .autoIuv(false)
                 .firmaRicevuta(FIRMA_RICEVUTA)
                 .trusted(false)
+                .idUtenza(prossimaIdUtenza++)
                 .build();
         entityManager.persist(app);
         Applicazione applicazione = entityManager.find(Applicazione.class, app.getId());
