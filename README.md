@@ -38,28 +38,51 @@ Il batch e' composto da un singolo job (`rtNotifyJob`) con un unico step chunk-o
 Tutti gli eventi delle chiamate (richiesta, risposta, eccezioni) sono tracciati sul
 **Giornale Degli Eventi (GDE)** tramite `GdeService`.
 
+## Requisiti
+
+- **GovPay 3.11.0 o successivo.** Il batch legge le pendenze nel modello dati v3
+  (posizioni debitorie, opzioni di pagamento, soggetti debitori) e non gira su un
+  database GovPay 3.10.
+- Le pendenze si leggono con la libreria **govpay-common-pendenze**, le anagrafiche e
+  i connettori con **govpay-common**.
+
 ## Entita' Database
 
-Il batch lavora su entita' GovPay pre-esistenti. Le tabelle principali coinvolte sono:
+Il batch non possiede schema: lavora sulle tabelle del database GovPay.
 
-### APPLICAZIONI
-- Anagrafica delle applicazioni dell'Ente Creditore.
-- Campo `cod_connettore_integrazione`: chiave del connettore RT da utilizzare per la notifica.
+Lette e aggiornate con entita' proprie del batch:
 
-### FR
-- Flussi di rendicontazione acquisiti dal sistema FDR di pagoPA.
+| Tabella | Uso |
+|---|---|
+| `NOTIFICHE` | Coda di spedizione delle ricevute: il batch legge le notifiche `RICEVUTA` da spedire e ne aggiorna stato, tentativi e prossima spedizione. |
+| `RPT` | Dati della ricevuta notificata all'Ente (esito, importo, attestante, XML della RT). |
+| `FR` | Flussi di rendicontazione acquisiti dal sistema FDR di pagoPA. |
+| `RENDICONTAZIONI` | Pagamenti rendicontati: il batch notifica quelli senza pagamento associato e ne registra la notifica (`notifica_inviata`). |
+| `APPLICAZIONI` | Applicazione destinataria; `cod_connettore_integrazione` indica il connettore da usare. |
 
-### RENDICONTAZIONI
-- Singoli pagamenti rendicontati all'interno di un FR. Il batch elabora gli item che
-  risultano da notificare.
-- Relazione opzionale con `VERSAMENTI` e quindi con `APPLICAZIONI`.
+Lette con govpay-common-pendenze (modello v3):
 
-### VERSAMENTI / SINGOLI_VERSAMENTI
-- Tabelle pre-esistenti GovPay per le posizioni debitorie e i singoli versamenti.
+| Tabella | Uso |
+|---|---|
+| `VERSAMENTI` | La pendenza pagata. |
+| `SINGOLI_VERSAMENTI` | Le voci della pendenza; per le rendicontazioni, il collegamento all'applicazione. |
+| `DOCUMENTI` | La posizione debitoria: documento e causale di default della ricevuta. |
+| `OPZIONI_PAGAMENTO` | Tipologia dell'opzione (soluzione unica, rata, soglia) e giorni. |
+| `SOGGETTI_DEBITORI` | Il soggetto pagatore, quello con `ordine = 0`. |
+| `PAGAMENTI` | Le riscossioni della RPT, una per voce pagata. |
 
-### CONNETTORI
-- Configurazione delle API esterne (URL, credenziali, timeout).
-- Risolto da `ConnettoreService` (libreria `govpay-common`).
+Lette con govpay-common:
+
+| Tabella | Uso |
+|---|---|
+| `DOMINI`, `UO`, `TIPI_VERSAMENTO`, `TRIBUTI`, `TIPI_TRIBUTO`, `IBAN_ACCREDITO` | Codici e descrizioni della sezione `pendenza` della ricevuta. |
+| `CONNETTORI` | Configurazione delle API dell'Ente (URL, credenziali, versione), risolta da `ConnettoreService`. |
+| `CONFIGURAZIONE` | Livelli di log modificabili a runtime (riga `log_level`). |
+| `BATCH_*` | Metadati delle esecuzioni Spring Batch e guardia anti-concorrenza fra nodi. |
+
+Le pendenze scartate dalla migrazione al modello v3 (tabella `migrazione_v3_scarti`)
+non hanno opzione di pagamento: la spedizione della loro ricevuta fallisce con un errore
+non bloccante e riparte dopo la bonifica.
 
 ## Configurazione
 
@@ -247,6 +270,11 @@ service, controller, config, mapper, listener).
 ```bash
 mvn test
 ```
+
+`SchemaV3IntegrationTest` avvia con Testcontainers un PostgreSQL con lo schema di
+GovPay 3.11.0 (`src/test/resources/db/postgresql/gov_pay-3.11.0.sql`) e valida le entita'
+sullo schema reale: serve Docker. La copia dello schema va riallineata quando cambia
+`gov_pay.sql` del core.
 
 La copertura del codice e' verificata in pipeline tramite **JaCoCo** e **SonarCloud**.
 
