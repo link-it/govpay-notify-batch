@@ -45,6 +45,10 @@ Si attiva con `govpay.batch.rt-send.enabled=true` (default `false`) e parte ogni
     - errore definitivo (applicazione o connettore non configurati, versione dell'API
       non supportata, pendenza non trovata): stato `ANNULLATA`.
 
+Ogni chiamata all'Ente, riuscita o fallita, e' tracciata sul GDE come evento
+`notificaRicevuta`, come nel core GovPay. Gli errori che bloccano la spedizione prima
+della chiamata (configurazione, pendenza non migrata) non producono eventi.
+
 ### Job `rtNotifyJob`: notifica delle rendicontazioni
 
 Riparte 2 ore dopo la fine dell'esecuzione precedente (`scheduler.rtNotifyJob.fixedDelayString`).
@@ -62,7 +66,7 @@ Riparte 2 ore dopo la fine dell'esecuzione precedente (`scheduler.rtNotifyJob.fi
   - Aggiorna lo stato delle rendicontazioni notificate.
   - Logga l'esito per ciascun item.
 
-Gli eventi delle chiamate di questo job (richiesta, risposta, eccezioni) sono tracciati
+Gli eventi delle chiamate di entrambi i job (richiesta, risposta, eccezioni) sono tracciati
 sul **Giornale Degli Eventi (GDE)** tramite `GdeService`.
 
 ## Requisiti
@@ -261,7 +265,7 @@ curl http://localhost:8080/api/batch/lastExecution
 # Prossima esecuzione stimata
 curl http://localhost:8080/api/batch/nextExecution
 
-# Svuotamento cache dei connettori di rtNotifyJob
+# Svuotamento cache dei connettori di entrambi i job
 curl http://localhost:8080/api/batch/clearCache
 ```
 
@@ -275,7 +279,7 @@ curl http://localhost:8080/api/batch/clearCache
 - I client REST sono cachati per codice connettore: `NotificaRendicontazioniApi` in
   `EnteApiService` e `NotificaRicevuteApi` in `EnteRicevutaApiService`. Applicazioni che
   condividono lo stesso connettore usano lo stesso client.
-- L'endpoint `/api/batch/clearCache` svuota la cache di `EnteApiService`.
+- L'endpoint `/api/batch/clearCache` svuota le cache di entrambi i service.
 
 ### Gestione errori HTTP
 - `rtSendJob`: vedi gli esiti del writer in [Architettura](#architettura-implementata).
@@ -291,7 +295,8 @@ curl http://localhost:8080/api/batch/clearCache
 - Prevenzione esecuzioni concorrenti.
 
 ### Integrazione GDE
-- Tracciamento eventi nel Giornale Degli Eventi (GDE) per ogni notifica di rendicontazione.
+- Tracciamento eventi nel Giornale Degli Eventi (GDE) per ogni notifica di rendicontazione
+  e per ogni spedizione di ricevuta (evento `notificaRicevuta`, con idA2A e idPendenza).
 - Payload completo delle richieste/risposte API (header, body, status).
 - Categoria evento `INTERFACCIA`, ruolo `CLIENT`, componente `API_ENTE`.
 

@@ -1,6 +1,9 @@
 package it.govpay.notify.batch.rt.service;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -22,6 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 import it.govpay.common.client.model.Connettore;
 import it.govpay.common.client.service.ConnettoreService;
 import it.govpay.common.entity.ApplicazioneEntity;
+import it.govpay.common.gde.GdeUtils;
 import it.govpay.common.repository.ApplicazioneRepository;
 import it.govpay.ec.client.api.NotificaRicevuteApi;
 import it.govpay.ec.client.api.impl.ApiClient;
@@ -30,6 +35,7 @@ import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.gde.service.GdeService;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
 import lombok.extern.slf4j.Slf4j;
 
@@ -45,6 +51,10 @@ import lombok.extern.slf4j.Slf4j;
  * Solo la versione {@link Costanti#VERSIONE_API_EC_SUPPORTATA} e' supportata
  * dalla PR corrente: altre versioni sollevano {@link UnsupportedOperationException},
  * trattata dal writer come errore di spedizione standard (updateDaSpedire).
+ * <p>
+ * Ogni chiamata all'ente, riuscita o fallita, e' registrata sul GDE. Gli errori
+ * precedenti alla chiamata (configurazione, pendenza non migrata) non producono
+ * eventi: non c'e' stata comunicazione con l'ente, come per {@code rtNotifyJob}.
  */
 @Slf4j
 @Service
@@ -53,6 +63,7 @@ public class EnteRicevutaApiService {
     private final ConnettoreService connettoreService;
     private final ApplicazioneRepository applicazioneRepository;
     private final RicevutaV2Mapper ricevutaV2Mapper;
+    private final GdeService gdeService;
     private final JsonMapper clientObjectMapper;
     private final Duration connectTimeout;
     private final Duration readTimeout;
@@ -76,12 +87,14 @@ public class EnteRicevutaApiService {
             ApplicazioneRepository applicazioneRepository,
             EnteApiClientConfig enteApiClientConfig,
             RicevutaV2Mapper ricevutaV2Mapper,
+            GdeService gdeService,
             PlatformTransactionManager transactionManager,
             @Value("${govpay.batch.rt-send.http.connect-timeout-ms:10000}") long connectTimeoutMs,
             @Value("${govpay.batch.rt-send.http.read-timeout-ms:30000}") long readTimeoutMs) {
         this.connettoreService = connettoreService;
         this.applicazioneRepository = applicazioneRepository;
         this.ricevutaV2Mapper = ricevutaV2Mapper;
+        this.gdeService = gdeService;
         this.clientObjectMapper = enteApiClientConfig.createEnteObjectMapper();
         this.connectTimeout = Duration.ofMillis(connectTimeoutMs);
         this.readTimeout = Duration.ofMillis(readTimeoutMs);
@@ -123,14 +136,39 @@ public class EnteRicevutaApiService {
         log.debug("Spedizione ricevuta RT a {} (codDominio={}, iuv={}, ccp={})",
                 codApplicazione, rpt.getCodDominio(), rpt.getIuv(), rpt.getCcp());
 
-        return api.notificaRicevutaWithHttpInfo(
-                rpt.getCodDominio(),
-                rpt.getIuv(),
-                rpt.getCcp(),
-                rpt.getCodSessione(),
-                rpt.getCodSessionePortale(),
-                rpt.getCodCarrello(),
-                payload);
+        String jsonRequest = GdeUtils.writeValueAsString(clientObjectMapper, payload);
+        String url = buildUrl(api.getApiClient().getBasePath(), rpt);
+        OffsetDateTime dataStart = OffsetDateTime.now(ZoneOffset.UTC);
+        try {
+            ResponseEntity<Void> response = api.notificaRicevutaWithHttpInfo(
+                    rpt.getCodDominio(),
+                    rpt.getIuv(),
+                    rpt.getCcp(),
+                    rpt.getCodSessione(),
+                    rpt.getCodSessionePortale(),
+                    rpt.getCodCarrello(),
+                    payload);
+            gdeService.saveNotificaRicevuta(ctx, jsonRequest, response, null,
+                    dataStart, OffsetDateTime.now(ZoneOffset.UTC), url);
+            return response;
+        } catch (RestClientException e) {
+            gdeService.saveNotificaRicevuta(ctx, jsonRequest, null, e,
+                    dataStart, OffsetDateTime.now(ZoneOffset.UTC), url);
+            throw e;
+        }
+    }
+
+    private static String buildUrl(String baseUrl, Rpt rpt) {
+        Map<String, String> pathParams = Map.of(
+                "{idDominio}", rpt.getCodDominio(),
+                "{iuv}", rpt.getIuv(),
+                "{idRicevuta}", rpt.getCcp());
+        // LinkedHashMap: ordine stabile e valori nulli ammessi (GdeUtils salta i parametri nulli)
+        Map<String, String> queryParams = new LinkedHashMap<>();
+        queryParams.put("idSession", rpt.getCodSessione());
+        queryParams.put("idSessionePortale", rpt.getCodSessionePortale());
+        queryParams.put("idCarrello", rpt.getCodCarrello());
+        return GdeUtils.buildUrl(baseUrl, Costanti.PATH_NOTIFICA_RICEVUTA, pathParams, queryParams);
     }
 
     /**

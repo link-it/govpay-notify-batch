@@ -25,6 +25,16 @@
 	("Pendenza non migrata al modello v3"): la notifica resta da spedire e riparte
 	dopo la bonifica. Una pendenza non trovata annulla la notifica.
 
+	* [GDE] Spedizione delle ricevute tracciata sul GDE.
+	Ogni chiamata PUT /ricevute all'Ente, riuscita o fallita, registra un evento
+	notificaRicevuta (componente API_ENTE) con dominio, IUV, CCP, applicazione e
+	pendenza, come il core GovPay. Gli errori precedenti alla chiamata non
+	producono eventi, come per la notifica delle rendicontazioni.
+
+	* [Bug] /api/batch/clearCache svuota anche la cache dei client delle ricevute.
+	Prima svuotava solo quella dei client delle rendicontazioni: una modifica al
+	connettore restava ignorata dalla spedizione delle ricevute fino al riavvio.
+
 	* [Bug] rpt.importo_totale_pagato mappato come Double.
 	La colonna e' DOUBLE PRECISION nello schema del core: la mappatura BigDecimal
 	non superava la validazione dello schema.

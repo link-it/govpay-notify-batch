@@ -21,6 +21,7 @@ import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.entity.Applicazione;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.gde.service.GdeService;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
@@ -50,7 +51,7 @@ class EnteRicevutaApiServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(config, "timezone", "Europe/Rome");
 
         service = new EnteRicevutaApiService(connettoreService, applicazioneRepository,
-                config, mapper, transactionManager, 1000L, 1000L);
+                config, mapper, mock(GdeService.class), transactionManager, 1000L, 1000L);
     }
 
     private Notifica notificaFor(String codApplicazione) {

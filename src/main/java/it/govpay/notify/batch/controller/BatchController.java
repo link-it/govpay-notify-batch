@@ -18,6 +18,7 @@ import it.govpay.common.batch.dto.NextExecutionInfo;
 import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.config.BatchControllerSupport;
+import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
 import it.govpay.notify.batch.service.EnteApiService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,12 +34,14 @@ public class BatchController extends AbstractBatchController {
     private final Job rtSendJob;
     private final boolean rtSendEnabled;
     private final EnteApiService enteApiService;
+    private final EnteRicevutaApiService enteRicevutaApiService;
 
     public BatchController(
             BatchControllerSupport support,
             @Qualifier("rtNotifyJob") Job rtNotifyJob,
             @Qualifier("rtSendJob") Job rtSendJob,
             EnteApiService enteApiService,
+            EnteRicevutaApiService enteRicevutaApiService,
             @Value("${govpay.batch.rt-send.enabled:false}") boolean rtSendEnabled) {
         super(support.jobExecutionHelper(), support.jobRepository(), support.environment(),
                 support.applicationZoneId(), support.schedulerIntervalMillis(), support.entityManager());
@@ -46,6 +49,7 @@ public class BatchController extends AbstractBatchController {
         this.rtSendJob = rtSendJob;
         this.rtSendEnabled = rtSendEnabled;
         this.enteApiService = enteApiService;
+        this.enteRicevutaApiService = enteRicevutaApiService;
     }
 
     @Override
@@ -72,6 +76,7 @@ public class BatchController extends AbstractBatchController {
     @Override
     protected ResponseEntity<String> clearCache() {
     	enteApiService.clearCache();
+        enteRicevutaApiService.clearCache();
         return ResponseEntity.ok("Cache connettori svuotata");
     }
 

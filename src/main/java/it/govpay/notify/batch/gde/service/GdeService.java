@@ -24,6 +24,7 @@ import it.govpay.gde.client.beans.NuovoEvento;
 import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.dto.RtNotifyContext;
 import it.govpay.notify.batch.gde.mapper.EventoRtMapper;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -34,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * Events include:
  * - rendicontazioni: Sending rendicontazione info to ente
+ * - notificaRicevuta: spedizione della ricevuta all'ente (rtSendJob)
  */
 @Slf4j
 @Service
@@ -137,6 +139,33 @@ public class GdeService extends AbstractGdeService {
 
         eventoRtMapper.setParametriRichiesta(nuovoEvento, url, "POST", GdeUtils.getCapturedRequestHeadersAsGdeHeaders(), jsonRequest);
         eventoRtMapper.setParametriRisposta(nuovoEvento, dataEnd, null, exception);
+
+        setResponsePayload(nuovoEvento, responseEntity, exception);
+
+        sendEventAsync(nuovoEvento);
+    }
+
+    /**
+     * Registra la spedizione di una ricevuta all'ente, riuscita o fallita.
+     *
+     * @param ctx             notifica spedita, con RPT e pendenza
+     * @param jsonRequest     json della ricevuta inviata
+     * @param responseEntity  risposta HTTP, se la chiamata e' riuscita
+     * @param exception       errore della chiamata, se e' fallita
+     * @param dataStart       timestamp inizio operazione
+     * @param dataEnd         timestamp fine operazione
+     * @param url             URL chiamato
+     */
+    public void saveNotificaRicevuta(NotificaContext ctx, String jsonRequest, ResponseEntity<?> responseEntity,
+                                     RestClientException exception, OffsetDateTime dataStart,
+                                     OffsetDateTime dataEnd, String url) {
+        String transactionId = UUID.randomUUID().toString();
+        NuovoEvento nuovoEvento = eventoRtMapper.createEventoRicevuta(
+                ctx, Costanti.TIPO_EVENTO_NOTIFICA_RICEVUTA, transactionId, dataStart, dataEnd,
+                responseEntity, exception);
+
+        eventoRtMapper.setParametriRichiesta(nuovoEvento, url, "PUT", GdeUtils.getCapturedRequestHeadersAsGdeHeaders(), jsonRequest);
+        eventoRtMapper.setParametriRisposta(nuovoEvento, dataEnd, responseEntity, exception);
 
         setResponsePayload(nuovoEvento, responseEntity, exception);
 

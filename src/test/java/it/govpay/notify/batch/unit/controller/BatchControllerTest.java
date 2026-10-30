@@ -23,6 +23,7 @@ import it.govpay.common.batch.runner.JobExecutionHelper;
 import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.config.BatchControllerSupport;
 import it.govpay.notify.batch.controller.BatchController;
+import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
 import it.govpay.notify.batch.service.EnteApiService;
 import jakarta.persistence.EntityManager;
 
@@ -34,6 +35,7 @@ class BatchControllerTest {
     private Job rtNotifyJob;
     private Job rtSendJob;
     private EnteApiService enteApiService;
+    private EnteRicevutaApiService enteRicevutaApiService;
     private Environment environment;
     private ZoneId applicationZoneId;
     private EntityManager entityManager;
@@ -47,6 +49,7 @@ class BatchControllerTest {
         rtNotifyJob = mock(Job.class);
         rtSendJob = mock(Job.class);
         enteApiService = mock(EnteApiService.class);
+        enteRicevutaApiService = mock(EnteRicevutaApiService.class);
         environment = mock(Environment.class);
         applicationZoneId = ZoneId.of("Europe/Rome");
         entityManager = mock(EntityManager.class);
@@ -62,7 +65,7 @@ class BatchControllerTest {
                 applicationZoneId,
                 3_600_000L,
                 entityManager);
-        return new BatchController(support, rtNotifyJob, rtSendJob, enteApiService, rtSendEnabled);
+        return new BatchController(support, rtNotifyJob, rtSendJob, enteApiService, enteRicevutaApiService, rtSendEnabled);
     }
 
     @Test
@@ -106,7 +109,7 @@ class BatchControllerTest {
     }
 
     @Test
-    @DisplayName("clearCache delegates to EnteApiService and returns 200 OK")
+    @DisplayName("clearCache svuota le cache di entrambi i job e risponde 200 OK")
     void clearCacheDelegatesAndReturnsOk() {
         ResponseEntity<String> response = ReflectionTestUtils.invokeMethod(controller, "clearCache");
 
@@ -114,6 +117,7 @@ class BatchControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Cache connettori svuotata", response.getBody());
         verify(enteApiService).clearCache();
+        verify(enteRicevutaApiService).clearCache();
     }
 
     @Test
@@ -124,6 +128,7 @@ class BatchControllerTest {
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(enteApiService).clearCache();
+        verify(enteRicevutaApiService).clearCache();
     }
 
     @Test
