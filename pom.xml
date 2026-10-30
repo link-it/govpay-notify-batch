@@ -22,6 +22,8 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- govpay-common-pendenze (non nel BOM) -->
+        <govpay-common-pendenze.version>1.0.0-SNAPSHOT</govpay-common-pendenze.version>
         <!-- OWASP Dependency Check -->
         <owasp.falsePositives.dir>src/main/resources/owasp/falsePositives</owasp.falsePositives.dir>
 
@@ -100,6 +102,13 @@
             <groupId>org.gov4j.govpay</groupId>
             <artifactId>govpay-common</artifactId>
             <version>2.0.4-SNAPSHOT</version>
+        </dependency>
+
+        <!-- Pendenze nel modello dati v3 (GovPay 3.11) -->
+        <dependency>
+            <groupId>org.gov4j.govpay</groupId>
+            <artifactId>govpay-common-pendenze</artifactId>
+            <version>${govpay-common-pendenze.version}</version>
         </dependency>
 
         <dependency>
