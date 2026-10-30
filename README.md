@@ -7,21 +7,48 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=link-it_govpay-notify-batch&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=link-it_govpay-notify-batch)
 [![Docker Hub](https://img.shields.io/docker/v/linkitaly/govpay-notify-batch?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/linkitaly/govpay-notify-batch)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://raw.githubusercontent.com/link-it/govpay-notify-batch/main/LICENSE)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
 
 ## Sommario
 
-Batch Spring Boot per la notifica delle ricevute di rendicontazione (RT) alle applicazioni
-dell'Ente Creditore. Il batch individua le rendicontazioni acquisite ma non ancora notificate
-all'applicazione di pertinenza e le invia tramite chiamata REST verso l'endpoint configurato
-sul connettore dell'applicazione.
+Batch Spring Boot che invia alle applicazioni dell'Ente Creditore le notifiche di GovPay,
+chiamando le API di integrazione dell'Ente configurate sul connettore dell'applicazione:
+
+- **ricevute di pagamento** (RT): le notifiche `RICEVUTA` in coda nella tabella
+  `NOTIFICHE`, inviate con `PUT /ricevute/{idDominio}/{iuv}/{idRicevuta}`;
+- **rendicontazioni**: i pagamenti rendicontati nei flussi FR e non ancora notificati,
+  inviati con `POST /rendicontazioni`.
 
 ## Architettura Implementata
 
-Il batch e' composto da un singolo job (`rtNotifyJob`) con un unico step chunk-oriented
-(`rtNotifyStep`) che processa le rendicontazioni da notificare.
+Il batch ha due job, ciascuno con un solo step chunk-oriented.
 
-### Step: Notifica Rendicontazioni
+### Job `rtSendJob`: spedizione delle ricevute
+
+Si attiva con `govpay.batch.rt-send.enabled=true` (default `false`) e parte ogni minuto
+(`scheduler.rtSendJob.cron`), come nel monolite GovPay.
+
+- **Reader**: `RtSendReader`
+  - Legge una pagina di notifiche `RICEVUTA` in stato `DA_SPEDIRE` con data di prossima
+    spedizione scaduta (`govpay.batch.rt-send.chunk-size`, default 50).
+  - Per ogni notifica carica con govpay-common-pendenze la pendenza della RPT, con voci,
+    opzione di pagamento e posizione debitoria, e le riscossioni della RPT.
+- **Processor**: `RtSendProcessor`
+  - Costruisce la ricevuta con `RicevutaV2Mapper` e `PendenzaPagataMapper` e la invia con
+    `EnteRicevutaApiService`. Il connettore deve avere la versione `REST_2` dell'API EC.
+- **Writer**: `RtSendWriter`
+  - Aggiorna ogni notifica in una transazione propria (`RtSendStatusUpdater`):
+    - spedita: stato `SPEDITO`;
+    - errore non bloccante (errore HTTP, timeout, pendenza non migrata al modello v3):
+      resta `DA_SPEDIRE`, con nuovo tentativo dopo tentativi² minuti, fino a un massimo
+      di 24 ore;
+    - errore definitivo (applicazione o connettore non configurati, versione dell'API
+      non supportata, pendenza non trovata): stato `ANNULLATA`.
+
+### Job `rtNotifyJob`: notifica delle rendicontazioni
+
+Riparte 2 ore dopo la fine dell'esecuzione precedente (`scheduler.rtNotifyJob.fixedDelayString`).
+
 - **Reader**: `RtNotifyReader`
   - Legge le rendicontazioni da notificare entro la finestra temporale configurata
     (`govpay.batch.finestra-temporale`, default 90 giorni).
@@ -35,8 +62,8 @@ Il batch e' composto da un singolo job (`rtNotifyJob`) con un unico step chunk-o
   - Aggiorna lo stato delle rendicontazioni notificate.
   - Logga l'esito per ciascun item.
 
-Tutti gli eventi delle chiamate (richiesta, risposta, eccezioni) sono tracciati sul
-**Giornale Degli Eventi (GDE)** tramite `GdeService`.
+Gli eventi delle chiamate di questo job (richiesta, risposta, eccezioni) sono tracciati
+sul **Giornale Degli Eventi (GDE)** tramite `GdeService`.
 
 ## Requisiti
 
@@ -91,9 +118,9 @@ non bloccante e riparte dopo la bonifica.
 La configurazione delle API REST dell'Ente (URL, credenziali, timeout) e' gestita tramite
 la tabella `CONNETTORI` del database GovPay, attraverso la libreria `govpay-common`.
 
-Ogni applicazione ha il proprio connettore RT configurato nel campo
+Ogni applicazione ha il proprio connettore configurato nel campo
 `cod_connettore_integrazione` della tabella `APPLICAZIONI`. Il batch risolve il connettore
-per ogni rendicontazione partendo dall'applicazione associata.
+per ogni ricevuta e ogni rendicontazione partendo dall'applicazione destinataria.
 
 ### Parametri Batch
 ```properties
@@ -112,11 +139,28 @@ govpay.batch.stale-threshold-minutes=120
 # Dimensione chunk per lo step rtNotifyStep
 govpay.batch.notify-chunk-size=1
 
-# Intervallo di scheduling (ms, default: 2 ore)
+# Intervallo di scheduling di rtNotifyJob (ms, default: 2 ore)
 scheduler.rtNotifyJob.fixedDelayString=7200000
 
 # Ritardo iniziale prima della prima esecuzione (ms)
 scheduler.initialDelayString=1
+
+# Spedizione delle ricevute (rtSendJob): disabilitata di default
+govpay.batch.rt-send.enabled=false
+
+# Notifiche lette per esecuzione e dimensione del chunk di rtSendJob
+govpay.batch.rt-send.chunk-size=50
+
+# Timeout HTTP verso l'API dell'Ente (ms)
+govpay.batch.rt-send.http.connect-timeout-ms=10000
+govpay.batch.rt-send.http.read-timeout-ms=30000
+
+# Schedulazione di rtSendJob (cron Spring a 6 campi, default ogni minuto)
+scheduler.rtSendJob.cron=0 * * * * *
+
+# Fuso orario delle colonne temporali; govpay-common-pendenze usa lo stesso
+spring.jackson.time-zone=Europe/Rome
+govpay.pendenze.fuso-orario=${spring.jackson.time-zone}
 ```
 
 ### Database
@@ -181,7 +225,7 @@ per indicare la directory contenente i driver JDBC:
 # Avvio applicazione (modalita' schedulata - profilo default)
 java -Dloader.path=./jdbc-drivers -jar target/govpay-notify-batch.jar
 
-# Esecuzione singola (profilo cron - esegue una volta e termina)
+# Esecuzione singola di rtNotifyJob (profilo cron - esegue una volta e termina)
 java -Dloader.path=./jdbc-drivers -jar target/govpay-notify-batch.jar --spring.profiles.active=cron
 ```
 
@@ -197,7 +241,10 @@ docker run -v ./jdbc-drivers:/opt/jdbc-drivers linkitaly/govpay-notify-batch
 ```
 
 ### Trigger Manuale via REST
-Il job puo' essere avviato manualmente tramite endpoint REST esposti da `BatchController`:
+I job possono essere avviati manualmente tramite endpoint REST esposti da `BatchController`.
+`/run` avvia `rtNotifyJob` e la risposta riguarda solo questo job. Se la spedizione delle
+ricevute e' abilitata, avvia anche `rtSendJob` in background, a meno che non sia gia' in
+esecuzione.
 ```bash
 # Avvio job
 curl http://localhost:8080/api/batch/run
@@ -214,7 +261,7 @@ curl http://localhost:8080/api/batch/lastExecution
 # Prossima esecuzione stimata
 curl http://localhost:8080/api/batch/nextExecution
 
-# Svuotamento cache connettori
+# Svuotamento cache dei connettori di rtNotifyJob
 curl http://localhost:8080/api/batch/clearCache
 ```
 
@@ -225,13 +272,14 @@ curl http://localhost:8080/api/batch/clearCache
 - Supporto multi-applicazione con credenziali diverse per ciascun connettore.
 
 ### Caching dei client API
-- Le istanze `NotificaRendicontazioniApi` sono cachate per codice connettore in
-  `EnteApiService`, evitando la creazione ripetuta di client REST per applicazioni che
-  condividono lo stesso connettore.
-- La cache puo' essere svuotata via endpoint `/api/batch/clearCache`.
+- I client REST sono cachati per codice connettore: `NotificaRendicontazioniApi` in
+  `EnteApiService` e `NotificaRicevuteApi` in `EnteRicevutaApiService`. Applicazioni che
+  condividono lo stesso connettore usano lo stesso client.
+- L'endpoint `/api/batch/clearCache` svuota la cache di `EnteApiService`.
 
 ### Gestione errori HTTP
-- `400 Bad Request`, `401 Unauthorized`, `403 Forbidden` e altri errori HTTP vengono
+- `rtSendJob`: vedi gli esiti del writer in [Architettura](#architettura-implementata).
+- `rtNotifyJob`: `400 Bad Request`, `401 Unauthorized`, `403 Forbidden` e altri errori HTTP vengono
   tracciati come eventi KO sul GDE con dettaglio dello status code, e lo step prosegue
   sull'item successivo.
 - Errori di marshalling JSON vengono tracciati come KO con esito 400.
@@ -243,7 +291,7 @@ curl http://localhost:8080/api/batch/clearCache
 - Prevenzione esecuzioni concorrenti.
 
 ### Integrazione GDE
-- Tracciamento eventi nel Giornale Degli Eventi (GDE) per ogni notifica.
+- Tracciamento eventi nel Giornale Degli Eventi (GDE) per ogni notifica di rendicontazione.
 - Payload completo delle richieste/risposte API (header, body, status).
 - Categoria evento `INTERFACCIA`, ruolo `CLIENT`, componente `API_ENTE`.
 
@@ -254,7 +302,12 @@ curl http://localhost:8080/api/batch/clearCache
 
 ## Logging
 
-Il livello di log puo' essere configurato in `application.properties`:
+I livelli di log si leggono a runtime dalla riga `log_level` della tabella
+`CONFIGURAZIONE`, condivisa con gli altri componenti GovPay: una modifica fatta dalla
+console arriva al batch entro `LOG_LEVEL_REFRESH_INTERVAL` (default 60s). Ogni riga di log
+riporta transaction id e correlation id dell'esecuzione.
+
+I livelli iniziali si configurano in `application.properties`:
 
 ```properties
 logging.level.it.govpay.notify.batch=DEBUG
@@ -280,16 +333,17 @@ La copertura del codice e' verificata in pipeline tramite **JaCoCo** e **SonarCl
 
 ## Note Tecniche
 
-- **Java Version**: 21 (richiesto da Spring Boot 3.5.7)
-- **Spring Boot**: 3.5.7
-- **Spring Batch**: 5.x (incluso in Spring Boot Starter)
+- **Java Version**: 21
+- **Spring Boot**: 4.1.2
+- **Spring Batch**: 6.x (incluso in Spring Boot Starter)
+- **GovPay**: 3.11.0 o successivo
 - **Database**: PostgreSQL (prod), MySQL, Oracle, SQL Server, H2 (dev)
-- **Build Tool**: Maven 3.6.3+
+- **Build Tool**: Maven 3.8.1+ (minimo imposto dal BOM GovPay)
 
 ## Documentazione
 
 - **[ChangeLog](ChangeLog)** - Storia completa delle modifiche e release
-- **[RELEASE_NOTES.md](RELEASE_NOTES.md)** - Note di rilascio per versione
+- **[RELEASE_NOTES_2.0.0.md](RELEASE_NOTES_2.0.0.md)** - Note di rilascio della versione 2.0.0
 
 ## Contribuire
 
