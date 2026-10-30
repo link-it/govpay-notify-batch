@@ -39,6 +39,7 @@ import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.entity.Applicazione;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
 
@@ -77,7 +78,7 @@ class EnteRicevutaApiServiceHttpTest {
                 .codApplicazione(COD_APP).codConnettoreIntegrazione(COD_CONN).build();
         when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(app));
         when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Map.of("VERSIONE", "REST_2"));
-        when(mapper.toRicevuta(any())).thenReturn(new Ricevuta());
+        when(mapper.toRicevuta(any(), any(), any())).thenReturn(new Ricevuta());
     }
 
     private EnteRicevutaApiService serviceWith(RestTemplate restTemplate, String baseUrl) {
@@ -118,11 +119,11 @@ class EnteRicevutaApiServiceHttpTest {
                 .andExpect(method(HttpMethod.PUT))
                 .andRespond(withSuccess());
 
-        ResponseEntity<Void> response = service.sendRicevuta(notifica(), rpt());
+        ResponseEntity<Void> response = service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         mockServer.verify();
-        verify(mapper).toRicevuta(any());
+        verify(mapper).toRicevuta(any(), any(), any());
     }
 
     @Test
@@ -135,15 +136,15 @@ class EnteRicevutaApiServiceHttpTest {
         mockServer.expect(ExpectedCount.twice(), requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
                 .andRespond(withSuccess());
 
-        service.sendRicevuta(notifica(), rpt());
-        service.sendRicevuta(notifica(), rpt());
+        service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
+        service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         verify(connettoreService, times(1)).getRestTemplate(COD_CONN);
 
         service.clearCache();
         mockServer.reset();
         mockServer.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL))).andRespond(withSuccess());
-        service.sendRicevuta(notifica(), rpt());
+        service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         verify(connettoreService, times(2)).getRestTemplate(COD_CONN);
         verify(connettoreService).clearCache();
@@ -159,7 +160,7 @@ class EnteRicevutaApiServiceHttpTest {
         // API, dove i timeout vengono applicati alla factory.
         EnteRicevutaApiService service = serviceWith(restTemplate, "http://127.0.0.1:1");
 
-        assertThrows(RestClientException.class, () -> service.sendRicevuta(notifica(), rpt()));
+        assertThrows(RestClientException.class, () -> service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build()));
 
         assertEquals((int) CONNECT_TIMEOUT_MS, ReflectionTestUtils.getField(factory, "connectTimeout"));
         assertEquals((int) READ_TIMEOUT_MS, ReflectionTestUtils.getField(factory, "readTimeout"));
@@ -176,7 +177,7 @@ class EnteRicevutaApiServiceHttpTest {
         Object factoryPrimaDellInvio = restTemplate.getRequestFactory();
         mockServer.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL))).andRespond(withSuccess());
 
-        ResponseEntity<Void> response = service.sendRicevuta(notifica(), rpt());
+        ResponseEntity<Void> response = service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(factoryPrimaDellInvio, restTemplate.getRequestFactory());

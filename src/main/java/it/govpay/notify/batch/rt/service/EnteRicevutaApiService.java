@@ -30,6 +30,7 @@ import it.govpay.notify.batch.Costanti;
 import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -104,16 +105,20 @@ public class EnteRicevutaApiService {
     /**
      * Spedisce la ricevuta all'API di integrazione dell'Ente.
      *
-     * @throws IllegalStateException se l'applicazione o il connettore non sono configurati
+     * @throws IllegalStateException se l'applicazione o il connettore non sono configurati,
+     *         o se la pendenza della RPT non e' stata trovata
      * @throws UnsupportedOperationException se la versione del connettore non e' supportata
+     * @throws PendenzaNonMigrataException se la pendenza non e' nel modello v3
      */
-    public ResponseEntity<Void> sendRicevuta(Notifica notifica, Rpt rpt) {
+    public ResponseEntity<Void> sendRicevuta(NotificaContext ctx) {
+        Notifica notifica = ctx.getNotifica();
+        Rpt rpt = ctx.getRpt();
         String codApplicazione = notifica.getApplicazione().getCodApplicazione();
         String codConnettore = resolveConnectorCode(codApplicazione);
         verificaVersioneSupportata(codConnettore);
 
         NotificaRicevuteApi api = getOrCreateApi(codConnettore);
-        Ricevuta payload = ricevutaV2Mapper.toRicevuta(rpt);
+        Ricevuta payload = ricevutaV2Mapper.toRicevuta(rpt, ctx.getPendenza(), ctx.getPagamenti());
 
         log.debug("Spedizione ricevuta RT a {} (codDominio={}, iuv={}, ccp={})",
                 codApplicazione, rpt.getCodDominio(), rpt.getIuv(), rpt.getCcp());

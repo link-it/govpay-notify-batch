@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,8 +27,11 @@ import it.govpay.notify.batch.entity.Rpt;
 import it.govpay.notify.batch.entity.StatoSpedizione;
 import it.govpay.notify.batch.entity.TipoNotifica;
 import it.govpay.notify.batch.repository.NotificheRepository;
+import it.govpay.notify.batch.repository.PendenzaNotificaRepository;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.tasklet.RtSendReader;
+import it.govpay.pendenze.entity.Pagamento;
+import it.govpay.pendenze.entity.Pendenza;
 
 @DisplayName("RtSendReader")
 class RtSendReaderTest {
@@ -37,12 +41,14 @@ class RtSendReaderTest {
     private static final int PAGE_SIZE = 50;
 
     private NotificheRepository repo;
+    private PendenzaNotificaRepository pendenzaRepo;
     private RtSendReader reader;
 
     @BeforeEach
     void setUp() {
         repo = mock(NotificheRepository.class);
-        reader = new RtSendReader(repo, Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE), PAGE_SIZE);
+        pendenzaRepo = mock(PendenzaNotificaRepository.class);
+        reader = new RtSendReader(repo, pendenzaRepo, Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE), PAGE_SIZE);
     }
 
     private Notifica notifica(long id) {
@@ -94,6 +100,33 @@ class RtSendReaderTest {
         assertSame(seconda, ctx2.getNotifica());
         assertSame(seconda.getRpt(), ctx2.getRpt());
         assertNull(reader.read());
+    }
+
+    @Test
+    @DisplayName("ogni NotificaContext porta la pendenza della RPT e le sue riscossioni")
+    void caricaPendenzaEPagamenti() {
+        Notifica notifica = notifica(1L);
+        notifica.getRpt().setIdVersamento(7L);
+        stubNotifiche(notifica);
+        Pendenza pendenza = new Pendenza();
+        List<Pagamento> pagamenti = List.of(new Pagamento());
+        when(pendenzaRepo.findConVoci(7L)).thenReturn(Optional.of(pendenza));
+        when(pendenzaRepo.findPagamenti(10L)).thenReturn(pagamenti);
+
+        NotificaContext ctx = reader.read();
+
+        assertSame(pendenza, ctx.getPendenza());
+        assertSame(pagamenti, ctx.getPagamenti());
+    }
+
+    @Test
+    @DisplayName("RPT senza pendenza -> NotificaContext con pendenza null, senza eccezioni nel reader")
+    void rptSenzaPendenza() {
+        stubNotifiche(notifica(1L));
+
+        NotificaContext ctx = reader.read();
+
+        assertNull(ctx.getPendenza());
     }
 
     @Test

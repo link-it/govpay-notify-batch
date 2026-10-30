@@ -3,15 +3,19 @@ package it.govpay.notify.batch.rt.service;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 import org.springframework.stereotype.Component;
 
 import it.govpay.ec.client.beans.Dominio;
 import it.govpay.ec.client.beans.EsitoRpp;
+import it.govpay.ec.client.beans.ModelloPagamento;
 import it.govpay.ec.client.beans.Ricevuta;
 import it.govpay.ec.client.beans.RicevutaIstitutoAttestante;
 import it.govpay.ec.client.beans.RicevutaRt;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.pendenze.entity.Pagamento;
+import it.govpay.pendenze.entity.Pendenza;
 
 /**
  * Costruisce il payload {@link Ricevuta} v2 dell'EC API a partire dalla
@@ -19,18 +23,28 @@ import it.govpay.notify.batch.entity.Rpt;
  * {@code it.govpay.core.ec.v2.converter.RicevuteConverter} del monolite,
  * limitatamente ai campi necessari alla spedizione (il batch non ha JAXB,
  * quindi non valorizza il sotto-payload {@code rpt}/{@code rt.json} —
- * solo l'XML grezzo dell'RT).
+ * solo l'XML grezzo dell'RT). La sezione {@code pendenza} e' di {@link PendenzaPagataMapper}.
  */
 @Component
 public class RicevutaV2Mapper {
 
     private final ZoneId applicationZoneId;
+    private final PendenzaPagataMapper pendenzaPagataMapper;
 
-    public RicevutaV2Mapper(ZoneId applicationZoneId) {
+    public RicevutaV2Mapper(ZoneId applicationZoneId, PendenzaPagataMapper pendenzaPagataMapper) {
         this.applicationZoneId = applicationZoneId;
+        this.pendenzaPagataMapper = pendenzaPagataMapper;
     }
 
-    public Ricevuta toRicevuta(Rpt rpt) {
+    /**
+     * @throws IllegalStateException se la pendenza della RPT non e' stata trovata
+     * @throws PendenzaNonMigrataException se la pendenza non e' nel modello v3
+     */
+    public Ricevuta toRicevuta(Rpt rpt, Pendenza pendenza, List<Pagamento> pagamenti) {
+        if (pendenza == null) {
+            throw new IllegalStateException("Pendenza non trovata per la RPT " + rpt.getId()
+                    + " (id_versamento " + rpt.getIdVersamento() + ")");
+        }
         Ricevuta ricevuta = new Ricevuta();
 
         Dominio dominio = new Dominio();
@@ -64,6 +78,9 @@ public class RicevutaV2Mapper {
             ricevutaRt.setTipo(tipoRtFromVersione(rpt.getVersione()));
             ricevuta.setRt(ricevutaRt);
         }
+
+        ricevuta.setPendenza(pendenzaPagataMapper.toPendenzaPagata(pendenza, pagamenti));
+        ricevuta.setModello(ModelloPagamento.PAGAMENTO_AD_INIZIATIVA_PSP);
 
         return ricevuta;
     }

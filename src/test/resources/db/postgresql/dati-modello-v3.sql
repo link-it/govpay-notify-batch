@@ -1,7 +1,7 @@
 -- Una pendenza pagata e rendicontata, scritta come la scrive govpay-common-pendenze
 -- (modello v3, GovPay 3.11): posizione debitoria su documenti, opzione di pagamento,
 -- soggetto debitore in soggetti_debitori e segnaposto in versamenti.debitore_*.
--- Su di essa una notifica RICEVUTA da spedire e una rendicontazione da notificare.
+-- Su di essa una riscossione, una notifica RICEVUTA da spedire e una rendicontazione da notificare.
 
 INSERT INTO intermediari (id, cod_intermediario, cod_connettore_pdd, denominazione, principal, principal_originale, abilitato)
 VALUES (1, '11111111111', 'PDD', 'Intermediario di test', 'intermediario', 'intermediario', true);
@@ -24,6 +24,12 @@ VALUES (1, 'IMU', 'Imposta municipale', true);
 INSERT INTO tipi_vers_domini (id, id_tipo_versamento, id_dominio)
 VALUES (1, 1, 1);
 
+INSERT INTO tipi_tributo (id, cod_tributo)
+VALUES (1, 'TRIB-IMU');
+
+INSERT INTO tributi (id, abilitato, id_dominio, id_tipo_tributo)
+VALUES (1, true, 1, 1);
+
 INSERT INTO documenti (id, cod_documento, descrizione, id_dominio, id_applicazione)
 VALUES (1, 'POS-V3-1', 'Posizione debitoria di test', 1, 1);
 
@@ -32,7 +38,8 @@ INSERT INTO opzioni_pagamento (id, id_opzione_pagamento, tipologia, stato, versi
 VALUES (1, '6f1c2a3e-0b7d-4c55-9a51-3c2d8e4f5a61', 'SOLUZIONE_UNICA', 'ATTIVATA', 0, now(), now(), 1);
 
 INSERT INTO soggetti_debitori (id, ordine, tipo, identificativo, anagrafica, id_documento)
-VALUES (1, 0, 'F', 'RSSMRA80A01H501U', 'Mario Rossi', 1);
+VALUES (1, 0, 'F', 'RSSMRA80A01H501U', 'Mario Rossi', 1),
+       (2, 1, 'F', 'VRDGPP80A01H501X', 'Giuseppe Verdi', 1);
 
 INSERT INTO versamenti (id, cod_versamento_ente, importo_totale, stato_versamento, aggiornabile,
         data_creazione, data_ora_ultimo_aggiornamento,
@@ -50,8 +57,8 @@ VALUES (1, 'PND-V3-1', 100.00, 'ESEGUITO', false,
         1, 1);
 
 INSERT INTO singoli_versamenti (id, cod_singolo_versamento_ente, stato_singolo_versamento,
-        importo_singolo_versamento, indice_dati, id_versamento, id_dominio)
-VALUES (1, 'VOCE-V3-1', 'ESEGUITO', 100.00, 1, 1, 1);
+        importo_singolo_versamento, indice_dati, id_versamento, id_dominio, id_tributo)
+VALUES (1, 'VOCE-V3-1', 'ESEGUITO', 100.00, 1, 1, 1, 1);
 
 INSERT INTO rpt (id, iuv, ccp, cod_dominio, cod_msg_richiesta, data_msg_richiesta, stato,
         data_aggiornamento_stato, cod_stazione, versione, id_versamento,
@@ -61,6 +68,11 @@ VALUES (1, '01000000000000001', 'RCP-V3-1', '12345678901', 'MSG-V3-1', now() - i
         now() - interval '1 day', '11111111111_01', 'SANP_240', 1,
         now() - interval '1 day', 0, 100.00,
         'PSP001', 'PSP di test', 'CANALE001');
+
+INSERT INTO pagamenti (id, cod_dominio, iuv, indice_dati, importo_pagato, data_acquisizione, iur,
+        data_pagamento, stato, tipo, id_rpt, id_singolo_versamento)
+VALUES (1, '12345678901', '01000000000000001', 1, 100.00, now() - interval '1 day', 'RCP-V3-1',
+        now() - interval '1 day', 'PAGATO', 'ENTRATA', 1, 1);
 
 INSERT INTO notifiche (id, tipo_esito, stato, data_creazione, data_aggiornamento_stato,
         data_prossima_spedizione, tentativi_spedizione, id_applicazione, id_rpt)
