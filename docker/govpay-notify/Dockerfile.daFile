@@ -5,7 +5,7 @@ ARG govpay_notify_home=/opt/govpay-notify
 ARG govpay_notify_log=/var/log/govpay-notify
 
 LABEL maintainer="Link.it s.r.l."
-LABEL description="GovPay NOTIFY (Verifica attivazione NOTIFY) Batch Processor - Local Build"
+LABEL description="GovPay Notify Batch: notifica agli Enti Creditori delle rendicontazioni senza pagamento e spedizione delle ricevute di pagamento - Local Build"
 LABEL govpay.notify.version="${govpay_notify_fullversion}"
 USER root
 
@@ -66,11 +66,6 @@ USER govpay
 
 ENV SPRING_BATCH_JOB_ENABLED=false \
     GOVPAY_BATCH_ENABLED=true \
-    GOVPAY_BATCH_THREAD_POOL_SIZE=5 \
-    GOVPAY_BATCH_HEADERS_CHUNK_SIZE=1 \
-    GOVPAY_BATCH_METADATA_CHUNK_SIZE=100 \
-    GOVPAY_BATCH_PAYMENTS_CHUNK_SIZE=50 \
-    GOVPAY_BATCH_SKIP_LIMIT=10 \
     GOVPAY_BATCH_STALE_THRESHOLD_MINUTES=120 \
     MANAGEMENT_ENDPOINTS_WEB_BASE_PATH=/actuator \
     SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT=20000 \
@@ -78,9 +73,7 @@ ENV SPRING_BATCH_JOB_ENABLED=false \
     SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=600000 \
     SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=2 \
     SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=10 \
-    LOGGING_FILE_NAME=${GOVPAY_NOTIFY_LOGDIR}/govpay-notify.log \
-    LOGGING_DIRECTORYPATH=${GOVPAY_NOTIFY_LOGDIR} \
-    LOGGING_FILEPREFIX=govpay-notify
+    LOGGING_FILE_NAME=${GOVPAY_NOTIFY_LOGDIR}/govpay-notify.log
 
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
