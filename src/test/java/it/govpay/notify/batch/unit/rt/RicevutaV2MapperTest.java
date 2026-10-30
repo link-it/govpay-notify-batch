@@ -41,7 +41,7 @@ class RicevutaV2MapperTest {
                 .modelloPagamento("1")
                 .dataMsgRicevuta(LocalDateTime.of(2026, 6, 1, 10, 30))
                 .codEsitoPagamento(0)
-                .importoTotalePagato(new BigDecimal("12.34"))
+                .importoTotalePagato(12.34)
                 .xmlRt("<rt/>".getBytes())
                 .tipoIdentificativoAttestante("B")
                 .identificativoAttestante("BNLIITRR")
@@ -125,6 +125,17 @@ class RicevutaV2MapperTest {
         Ricevuta r = mapper.toRicevuta(rpt);
 
         assertNull(r.getEsito());
+    }
+
+    @Test
+    @DisplayName("importo totale pagato assente -> importo non valorizzato")
+    void importoTotalePagatoAssente() {
+        Rpt rpt = baseRpt();
+        rpt.setImportoTotalePagato(null);
+
+        Ricevuta r = mapper.toRicevuta(rpt);
+
+        assertNull(r.getImporto());
     }
 
     @Test

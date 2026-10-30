@@ -1,5 +1,6 @@
 package it.govpay.notify.batch.rt.service;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 
@@ -38,7 +39,9 @@ public class RicevutaV2Mapper {
 
         ricevuta.setIuv(rpt.getIuv());
         ricevuta.setIdRicevuta(rpt.getCcp());
-        ricevuta.setImporto(rpt.getImportoTotalePagato());
+        ricevuta.setImporto(rpt.getImportoTotalePagato() != null
+                ? BigDecimal.valueOf(rpt.getImportoTotalePagato())
+                : null);
         ricevuta.setEsito(toEsitoRpp(rpt.getCodEsitoPagamento()));
 
         OffsetDateTime dataRicevuta = rpt.getDataMsgRicevuta() != null
