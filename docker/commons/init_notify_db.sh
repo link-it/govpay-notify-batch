@@ -72,8 +72,13 @@ if [ "${GOVPAY_NOTIFY_LIVE_DB_CHECK_SKIP^^}" == "FALSE" ]; then
     DB_ALIVE=1
 
     while [ ${DB_ALIVE} -ne 0 ] && [ ${RETRY} -lt ${GOVPAY_NOTIFY_LIVE_DB_CHECK_MAX_RETRY} ]; do
-        nc -w ${GOVPAY_NOTIFY_LIVE_DB_CHECK_CONNECT_TIMEOUT} -z "${DB_HOST}" "${DB_PORT}"
-        DB_ALIVE=$?
+        # Con set -e un nc fallito fuori da un if chiuderebbe lo script al primo
+        # tentativo, senza riprovare.
+        if nc -w ${GOVPAY_NOTIFY_LIVE_DB_CHECK_CONNECT_TIMEOUT} -z "${DB_HOST}" "${DB_PORT}"; then
+            DB_ALIVE=0
+        else
+            DB_ALIVE=$?
+        fi
         RETRY=$((RETRY + 1))
 
         if [ ${DB_ALIVE} -ne 0 ]; then
@@ -143,6 +148,10 @@ transiso TRANSACTION_READ_COMMITTED
 charset UTF-8
 EOSQLTOOL
 
+# Comando SqlTool, usato sia dal readiness check sia dalla creazione dello
+# schema: va definito qui perche' il readiness check si puo' saltare.
+INVOCAZIONE_CLIENT="-Dfile.encoding=UTF-8 -cp ${GOVPAY_DS_JDBC_LIBS}/*:/opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb/lib/sqltool.jar org.hsqldb.cmdline.SqlTool --rcFile=${SQLTOOL_RC_FILE} "
+
 ##############################################################################
 # READINESS CHECK (Esistenza Tabella)
 ##############################################################################
@@ -150,7 +159,6 @@ EOSQLTOOL
 if [ "${GOVPAY_NOTIFY_READY_DB_CHECK_SKIP^^}" == "FALSE" ]; then
     log_info "Esecuzione readiness check (tabella: ${GOVPAY_NOTIFY_DB_CHECK_TABLE})..."
 
-    # Costruzione query di verifica in base al tipo di database
     # Costruzione query di verifica in base al tipo di database
     case "${GOVPAY_DB_TYPE}" in
         postgresql)
@@ -166,8 +174,6 @@ if [ "${GOVPAY_NOTIFY_READY_DB_CHECK_SKIP^^}" == "FALSE" ]; then
 
     RETRY=0
     TABLE_EXISTS=-1
-
-    INVOCAZIONE_CLIENT="-Dfile.encoding=UTF-8 -cp ${GOVPAY_DS_JDBC_LIBS}/*:/opt/hsqldb-${HSQLDB_FULLVERSION}/hsqldb/lib/sqltool.jar org.hsqldb.cmdline.SqlTool --rcFile=${SQLTOOL_RC_FILE} "
 
     while [ ${TABLE_EXISTS} -lt 0 ] && [ ${RETRY} -lt ${GOVPAY_NOTIFY_READY_DB_CHECK_MAX_RETRY} ]; do
         TABLE_COUNT=$(java ${INVOCAZIONE_CLIENT} \
@@ -257,16 +263,17 @@ esac
 # Esecuzione script SQL
 log_info "Esecuzione script SQL in corso..."
 
+# Con set -e un errore di SqlTool chiuderebbe lo script senza il messaggio
+# d'errore: l'exit code si raccoglie con ||.
+SQL_EXIT_CODE=0
 java ${INVOCAZIONE_CLIENT} \
     --continueOnErr=false \
-    notify_db <<EOSQL
+    notify_db <<EOSQL || SQL_EXIT_CODE=$?
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 ${START_TRANSACTION}
 \i /tmp/notify_sql/schema-${GOVPAY_DB_TYPE}.sql
 COMMIT;
 EOSQL
-
-SQL_EXIT_CODE=$?
 
 # Pulizia
 #rm -rf /tmp/notify_sql
