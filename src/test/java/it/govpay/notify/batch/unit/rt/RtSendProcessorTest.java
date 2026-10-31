@@ -24,6 +24,7 @@ import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.dto.RtSendOutcome;
 import it.govpay.notify.batch.rt.dto.RtSendResult;
 import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
+import it.govpay.notify.batch.rt.service.PendenzaNonMigrataException;
 import it.govpay.notify.batch.rt.tasklet.RtSendProcessor;
 
 @DisplayName("RtSendProcessor")
@@ -50,7 +51,7 @@ class RtSendProcessorTest {
     @Test
     @DisplayName("HTTP 2xx -> outcome SUCCESS, no descrizione, no tentativi")
     void success() {
-        when(service.sendRicevuta(any(), any())).thenReturn(ResponseEntity.status(HttpStatus.CREATED).build());
+        when(service.sendRicevuta(any())).thenReturn(ResponseEntity.status(HttpStatus.CREATED).build());
 
         RtSendResult r = processor.process(ctx);
 
@@ -64,7 +65,7 @@ class RtSendProcessorTest {
     @Test
     @DisplayName("RestClientException -> outcome ERROR, tentativi+1, descrizione troncata")
     void error() {
-        when(service.sendRicevuta(any(), any()))
+        when(service.sendRicevuta(any()))
                 .thenThrow(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "boom"));
 
         RtSendResult r = processor.process(ctx);
@@ -75,9 +76,21 @@ class RtSendProcessorTest {
     }
 
     @Test
+    @DisplayName("pendenza non migrata al modello v3 -> outcome ERROR: la notifica riparte dopo la bonifica")
+    void pendenzaNonMigrata() {
+        when(service.sendRicevuta(any())).thenThrow(new PendenzaNonMigrataException(42L));
+
+        RtSendResult r = processor.process(ctx);
+
+        assertEquals(RtSendOutcome.ERROR, r.getOutcome());
+        assertEquals(3L, r.getTentativiSpedizione());
+        assertEquals("Pendenza non migrata al modello v3 (id 42)", r.getDescrizione());
+    }
+
+    @Test
     @DisplayName("UnsupportedOperationException (versione) -> outcome ABORT")
     void abortVersione() {
-        when(service.sendRicevuta(any(), any()))
+        when(service.sendRicevuta(any()))
                 .thenThrow(new UnsupportedOperationException("versione REST_1 non supportata"));
 
         RtSendResult r = processor.process(ctx);
@@ -89,7 +102,7 @@ class RtSendProcessorTest {
     @Test
     @DisplayName("IllegalStateException (connettore assente) -> outcome ABORT")
     void abortConnettore() {
-        when(service.sendRicevuta(any(), any()))
+        when(service.sendRicevuta(any()))
                 .thenThrow(new IllegalStateException("connettore non configurato"));
 
         RtSendResult r = processor.process(ctx);
@@ -101,7 +114,7 @@ class RtSendProcessorTest {
     @DisplayName("descrizione oltre i 255 char di descrizione_stato -> troncata con ellissi")
     void descrizioneTroncataAlLimiteDellaColonna() {
         String messaggioLungo = "X".repeat(400);
-        when(service.sendRicevuta(any(), any())).thenThrow(new RestClientException(messaggioLungo));
+        when(service.sendRicevuta(any())).thenThrow(new RestClientException(messaggioLungo));
 
         RtSendResult r = processor.process(ctx);
 
@@ -112,7 +125,7 @@ class RtSendProcessorTest {
     @Test
     @DisplayName("descrizione entro il limite -> passata invariata")
     void descrizioneCortaNonToccata() {
-        when(service.sendRicevuta(any(), any())).thenThrow(new RestClientException("HTTP 503 dall'ente"));
+        when(service.sendRicevuta(any())).thenThrow(new RestClientException("HTTP 503 dall'ente"));
 
         RtSendResult r = processor.process(ctx);
 
@@ -122,7 +135,7 @@ class RtSendProcessorTest {
     @Test
     @DisplayName("eccezione senza messaggio -> descrizione null, nessun NPE nel troncamento")
     void descrizioneNullNonRompeIlTroncamento() {
-        when(service.sendRicevuta(any(), any())).thenThrow(new IllegalStateException((String) null));
+        when(service.sendRicevuta(any())).thenThrow(new IllegalStateException((String) null));
 
         RtSendResult r = processor.process(ctx);
 
@@ -134,7 +147,7 @@ class RtSendProcessorTest {
     @DisplayName("tentativi a null sulla notifica viene trattato come 0 di base")
     void tentativiNull() {
         ctx.getNotifica().setTentativiSpedizione(null);
-        when(service.sendRicevuta(any(), any()))
+        when(service.sendRicevuta(any()))
                 .thenThrow(new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE, "503"));
 
         RtSendResult r = processor.process(ctx);

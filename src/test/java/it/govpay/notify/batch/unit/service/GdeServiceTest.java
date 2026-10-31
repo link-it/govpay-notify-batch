@@ -31,6 +31,7 @@ import it.govpay.gde.client.beans.NuovoEvento;
 import it.govpay.notify.batch.dto.RtNotifyContext;
 import it.govpay.notify.batch.gde.mapper.EventoRtMapper;
 import it.govpay.notify.batch.gde.service.GdeService;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("GdeService")
@@ -215,6 +216,29 @@ class GdeServiceTest {
             verify(eventoRtMapper).createEventoKo(eq(rtInfo), anyString(), anyString(),
                     eq(dataStart), eq(dataEnd), isNull(), eq(exception));
             verify(eventoRtMapper).setParametriRichiesta(eq(mockEvento), contains("/rendicontazioni"), eq("POST"), anyList(), eq("{}"));
+            verify(gdeRestTemplate).postForEntity(eq(GDE_ENDPOINT), eq(mockEvento), eq(Void.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("saveNotificaRicevuta")
+    class SaveNotificaRicevutaTest {
+
+        @Test
+        @DisplayName("evento notificaRicevuta in PUT sull'URL chiamato, inviato al GDE")
+        void shouldCreateAndSendRicevutaEvent() {
+            setupGdeEnabled();
+            NotificaContext ctx = NotificaContext.builder().build();
+            ResponseEntity<Void> response = ResponseEntity.ok().build();
+            NuovoEvento mockEvento = new NuovoEvento();
+            when(eventoRtMapper.createEventoRicevuta(eq(ctx), eq("notificaRicevuta"), anyString(),
+                    eq(dataStart), eq(dataEnd), eq(response), isNull()))
+                    .thenReturn(mockEvento);
+
+            gdeService.saveNotificaRicevuta(ctx, "{}", response, null, dataStart, dataEnd, ENTE_BASE_URL + "/ricevute/x");
+
+            verify(eventoRtMapper).setParametriRichiesta(eq(mockEvento), eq(ENTE_BASE_URL + "/ricevute/x"), eq("PUT"), anyList(), eq("{}"));
+            verify(eventoRtMapper).setParametriRisposta(mockEvento, dataEnd, response, null);
             verify(gdeRestTemplate).postForEntity(eq(GDE_ENDPOINT), eq(mockEvento), eq(Void.class));
         }
     }

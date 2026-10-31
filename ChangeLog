@@ -1,5 +1,47 @@
 2026-10-30  Giuliano Pintori <pintori@link.it>
 
+	* [Modello dati v3] Adeguamento a GovPay 3.11.0 (issue #30).
+	Il batch richiede ora GovPay 3.11.0 o successivo e non gira su un database
+	3.10: le pendenze si leggono nel modello dati v3 con la libreria
+	govpay-common-pendenze. Le entity Versamento e SingoloVersamento del batch
+	sono eliminate; rpt, fr, rendicontazioni e notifiche restano sulle entity del
+	batch, con un nome di entity esplicito per non entrare in conflitto con quelle
+	omonime della libreria.
+
+	* [Ricevuta] Sezione pendenza nella ricevuta notificata all'Ente.
+	Cambiamento di contratto verso l'Ente: la ricevuta (PUT /ricevute) contiene
+	ora la sezione pendenza (PendenzaPagata) e il modello di pagamento, che prima
+	non erano inviati. La pendenza e' costruita con le regole v3: soggetto pagatore
+	dal soggetto debitore con ordine 0, documento dalla posizione debitoria (non per
+	le posizioni MIGR-<id> create dalla migrazione), rata e soglia dall'opzione di
+	pagamento, voci con la riscossione corrispondente. Non sono valorizzati i campi
+	senza equivalente v3 (anno di riferimento, cartella, tassonomia, direzione,
+	divisione, dati allegati, proprieta', contabilita' e metadata delle voci).
+	Le soglie RIDOTTO e SCONTATO non sono ancora inviate: il client EC non le
+	prevede (link-it/govpay-ec-client#7).
+
+	* [Ricevuta] Pendenze scartate dalla migrazione al modello v3.
+	Senza opzione di pagamento la spedizione fallisce con errore non bloccante
+	("Pendenza non migrata al modello v3"): la notifica resta da spedire e riparte
+	dopo la bonifica. Una pendenza non trovata annulla la notifica.
+
+	* [GDE] Spedizione delle ricevute tracciata sul GDE.
+	Ogni chiamata PUT /ricevute all'Ente, riuscita o fallita, registra un evento
+	notificaRicevuta (componente API_ENTE) con dominio, IUV, CCP, applicazione e
+	pendenza, come il core GovPay. Gli errori precedenti alla chiamata non
+	producono eventi, come per la notifica delle rendicontazioni.
+
+	* [Bug] /api/batch/clearCache svuota anche la cache dei client delle ricevute.
+	Prima svuotava solo quella dei client delle rendicontazioni: una modifica al
+	connettore restava ignorata dalla spedizione delle ricevute fino al riavvio.
+
+	* [Bug] rpt.importo_totale_pagato mappato come Double.
+	La colonna e' DOUBLE PRECISION nello schema del core: la mappatura BigDecimal
+	non superava la validazione dello schema.
+
+	* [Test] Test su PostgreSQL con lo schema reale di GovPay 3.11.0
+	(Testcontainers): richiedono Docker.
+
 	* [Docker] GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON torna ad avere effetto.
 	L'entrypoint la convertiva in SCHEDULER_NOTIFYACQUISITIONJOB_FIXEDDELAYSTRING,
 	che il batch non legge: ora esporta SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING
@@ -27,6 +69,8 @@
 	${packaging.type}, layout WAR del plugin Spring Boot (ZIP resta per il jar),
 	Application estende SpringBootServletInitializer. Il war usa il datasource
 	JNDI dell'application server (spring.datasource.jndi-name).
+
+	Avanzata la versione del progetto a 2.1.0-SNAPSHOT.
 
 2026-09-28  Giuliano Pintori <pintori@link.it>
 

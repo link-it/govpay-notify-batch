@@ -2,6 +2,8 @@ package it.govpay.notify.batch.gde.mapper;
 
 import it.govpay.gde.client.beans.*;
 import it.govpay.notify.batch.dto.RtNotifyContext;
+import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -52,7 +54,7 @@ public class EventoRtMapper {
      */
     public NuovoEvento createEvento(RtNotifyContext rtInfo, String tipoEvento, String transactionId,
                                     OffsetDateTime dataStart, OffsetDateTime dataEnd) {
-        NuovoEvento nuovoEvento = new NuovoEvento();
+        NuovoEvento nuovoEvento = createEventoBase(tipoEvento, transactionId, dataStart, dataEnd);
 
         if (rtInfo != null) {
         	nuovoEvento.setIdDominio(rtInfo.getTaxCode());
@@ -60,6 +62,50 @@ public class EventoRtMapper {
         	nuovoEvento.setCcp(rtInfo.getIur());
         	nuovoEvento.setDatiPagoPA(createDatiPagoPA(rtInfo));
         }
+        return nuovoEvento;
+    }
+
+    /**
+     * Crea l'evento della spedizione di una ricevuta (rtSendJob), con gli stessi
+     * riferimenti che registra il core: dominio, IUV, CCP, applicazione e pendenza.
+     *
+     * @param ctx              notifica da spedire, con RPT e pendenza
+     * @param tipoEvento       tipo evento (operationId dell'API di notifica)
+     * @param transactionId    identificativo della transazione
+     * @param dataStart        inizio della chiamata
+     * @param dataEnd          fine della chiamata
+     * @param responseEntity   risposta dell'ente, se c'e'
+     * @param exception        errore della chiamata, se c'e'
+     * @return NuovoEvento con esito OK se non c'e' errore, altrimenti KO o FAIL
+     */
+    public NuovoEvento createEventoRicevuta(NotificaContext ctx, String tipoEvento, String transactionId,
+                                            OffsetDateTime dataStart, OffsetDateTime dataEnd,
+                                            ResponseEntity<?> responseEntity, RestClientException exception) {
+        NuovoEvento nuovoEvento = createEventoBase(tipoEvento, transactionId, dataStart, dataEnd);
+
+        Rpt rpt = ctx.getRpt();
+        nuovoEvento.setIdDominio(rpt.getCodDominio());
+        nuovoEvento.setIuv(rpt.getIuv());
+        nuovoEvento.setCcp(rpt.getCcp());
+        nuovoEvento.setIdA2A(ctx.getNotifica().getApplicazione().getCodApplicazione());
+        if (ctx.getPendenza() != null) {
+            nuovoEvento.setIdPendenza(ctx.getPendenza().getIdPendenza());
+        }
+        DatiPagoPA datiPagoPA = new DatiPagoPA();
+        datiPagoPA.setIdDominio(rpt.getCodDominio());
+        nuovoEvento.setDatiPagoPA(datiPagoPA);
+
+        if (exception == null) {
+            nuovoEvento.setEsito(EsitoEvento.OK);
+        } else {
+            extractExceptionInfo(responseEntity, exception, nuovoEvento);
+        }
+        return nuovoEvento;
+    }
+
+    private NuovoEvento createEventoBase(String tipoEvento, String transactionId,
+                                         OffsetDateTime dataStart, OffsetDateTime dataEnd) {
+        NuovoEvento nuovoEvento = new NuovoEvento();
 
         // Set event metadata
         nuovoEvento.setCategoriaEvento(CategoriaEvento.INTERFACCIA);

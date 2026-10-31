@@ -18,20 +18,19 @@ public interface RendicontazioniRepository extends JpaRepository<Rendicontazione
 	              "fr.iur, fr.dataRegolamento, fr.dataOraPubblicazione, " +
 	              "fr.dataOraAggiornamento, fr.codPsp, " +
 	              "fr.codBicRiversamento, fr.revisione, a.codApplicazione " +
-	       "FROM Rendicontazione r " +
+	       "FROM NotifyRendicontazione r " +
 	              "JOIN r.fr fr " +
 	              "JOIN fr.dominio d " +
-	              "JOIN r.singoloVersamento sv " +
-	              "JOIN sv.versamento v " +
-	              "JOIN v.applicazione a " +
+	              "JOIN VocePendenza voce ON voce.id = r.idSingoloVersamento " +
+	              "JOIN voce.pendenza p " +
+	              "JOIN Applicazione a ON a.id = p.idApplicazione " +
 	       "WHERE fr.dataAcquisizione > :dataLimite " +
-	              "AND r.singoloVersamento IS NOT NULL " +
 	              "AND r.idPagamento IS NULL " +
 	              "AND r.eseguiRecuperoRt = false " +
 	              "AND r.notificaInviata = false")
     List<Object[]> findRendicontazioneWithNoPagamentoAfterId( @Param("dataLimite") LocalDateTime dataLimite );
 
     @Modifying
-    @Query("UPDATE Rendicontazione r SET r.notificaInviata = true WHERE r.id = :id")
+    @Query("UPDATE NotifyRendicontazione r SET r.notificaInviata = true WHERE r.id = :id")
     void registerNotificaRt(@Param("id") Long id);
 }
