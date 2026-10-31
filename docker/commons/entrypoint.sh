@@ -1,7 +1,8 @@
 #!/bin/bash
 
 ##############################################################################
-# GovPay NOTIFY (Verifica attivazione NOTIFY) - Script di Entrypoint
+# GovPay Notify Batch (notifica delle rendicontazioni e spedizione delle
+# ricevute agli Enti Creditori) - Script di Entrypoint
 #
 # Supporta nomenclatura variabili legacy e govpay-docker
 ##############################################################################
@@ -117,8 +118,7 @@ GOVPAY_NOTIFY_MAX_POOL=${GOVPAY_NOTIFY_MAX_POOL:-10}
 
 if [ "${GOVPAY_NOTIFY_POP_DB_SKIP:-TRUE}" != "TRUE" ] && [ -n "${GOVPAY_DB_TYPE}" ]; then
     log_info "Esecuzione script di inizializzazione database..."
-    /usr/local/bin/init_notify_db.sh
-    if [ $? -ne 0 ]; then
+    if ! /usr/local/bin/init_notify_db.sh; then
         log_error "Inizializzazione database fallita"
         exit 1
     fi
@@ -135,20 +135,14 @@ GOVPAY_BATCH_CLUSTER_ID=$(grep -E "[[:space:]]${HOSTNAME}[[:space:]]*" /etc/host
 export GOVPAY_BATCH_CLUSTER_ID
 
 ##############################################################################
-# Configurazione Integrazione GDE
+# Integrazione GDE
 ##############################################################################
 
-# Integrazione GDE disabilitata di default a meno che non venga fornito GOVPAY_NOTIFY_GDE_URL
+# L'invio degli eventi al GDE si configura con il connettore govpay_gde_api
+# nel database di GovPay (GdeService di govpay-common), non con variabili
+# d'ambiente. GOVPAY_NOTIFY_GDE_URL e' rimasta da versioni precedenti.
 if [ -n "${GOVPAY_NOTIFY_GDE_URL}" ]; then
-    GOVPAY_GDE_ENABLED=true
-    GOVPAY_GDE_BASE_URL="${GOVPAY_NOTIFY_GDE_URL}"
-    export GOVPAY_GDE_ENABLED GOVPAY_GDE_BASE_URL
-    log_info "Integrazione GDE abilitata"
-    log_info "URL GDE: ${GOVPAY_GDE_BASE_URL}"
-else
-    GOVPAY_GDE_ENABLED=false
-    export GOVPAY_GDE_ENABLED
-    log_info "Integrazione GDE disabilitata"
+    log_warn "GOVPAY_NOTIFY_GDE_URL non ha effetto e verra' ignorata: l'invio al GDE si configura con il connettore govpay_gde_api di GovPay."
 fi
 
 ##############################################################################
@@ -171,12 +165,24 @@ case "${GOVPAY_NOTIFY_BATCH_USA_CRON,,}" in
         log_info "Modalità deployment: SCHEDULER INTERNO (auto-schedulato)"
         SERVER_PORT=${SERVER_PORT:-10001}
 
-        # Conversione intervallo da minuti a millisecondi (default: 120 minuti = 2 ore)
-        INTERVALLO_MINUTI=${GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON:-120}
-        SCHEDULER_NOTIFYACQUISITIONJOB_FIXEDDELAYSTRING=$((INTERVALLO_MINUTI * 60 * 1000))
+        # Intervallo di rtNotifyJob (proprieta' scheduler.rtNotifyJob.fixedDelayString,
+        # in ms). Un valore impostato direttamente con SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING
+        # ha la precedenza; altrimenti si converte GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON
+        # da minuti a millisecondi (default: 120 minuti = 2 ore).
+        if [ -n "${SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING}" ]; then
+            [ -n "${GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON}" ] && log_warn "GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON ignorata: e' impostata SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING."
+            log_info "Porta HTTP: ${SERVER_PORT}, Intervallo scheduler: ${SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING}ms (da SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING)"
+        else
+            INTERVALLO_MINUTI=${GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON:-120}
+            if ! [[ "${INTERVALLO_MINUTI}" =~ ^[0-9]+$ ]] || [ "${INTERVALLO_MINUTI}" -eq 0 ]; then
+                log_error "GOVPAY_NOTIFY_BATCH_INTERVALLO_CRON deve essere un numero intero di minuti maggiore di zero: ${INTERVALLO_MINUTI}"
+                exit 1
+            fi
+            SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING=$((10#${INTERVALLO_MINUTI} * 60 * 1000))
+            log_info "Porta HTTP: ${SERVER_PORT}, Intervallo scheduler: ${INTERVALLO_MINUTI} minuti (${SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING}ms)"
+        fi
 
-        export SERVER_PORT SCHEDULER_NOTIFYACQUISITIONJOB_FIXEDDELAYSTRING
-        log_info "Porta Actuator: ${SERVER_PORT}, Intervallo scheduler: ${INTERVALLO_MINUTI} minuti (${SCHEDULER_NOTIFYACQUISITIONJOB_FIXEDDELAYSTRING}ms)"
+        export SERVER_PORT SCHEDULER_RTNOTIFYJOB_FIXEDDELAYSTRING
         ;;
 esac
 
@@ -208,7 +214,6 @@ log_info "Riepilogo Configurazione"
 log_info "========================================"
 log_info "Database: ${SPRING_DATASOURCE_URL}"
 log_info "Pool: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE}/${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE}"
-log_info "GDE: ${GOVPAY_GDE_ENABLED}"
 log_info "Cluster ID: ${GOVPAY_BATCH_CLUSTER_ID}"
 log_info "Java: MaxRAMPercentage=${GOVPAY_NOTIFY_JVM_MAX_RAM_PERCENTAGE:-${DEFAULT_MAX_RAM_PERCENTAGE}}%"
 log_info "========================================"
