@@ -32,6 +32,10 @@ public class Costanti {
     // Non sono URI completi (mancano protocollo e host) con il baseUrl configurabile tramite il Connettore nel DB.
     public static final String PATH_NOTIFY_RND = "/rendicontazioni";
     public static final String PATH_NOTIFY_RT = "/ricevute";
+    public static final String PATH_NOTIFICA_RICEVUTA = "/ricevute/{idDominio}/{iuv}/{idRicevuta}";
+
+    // Tipo evento GDE della spedizione delle ricevute: operationId dell'API, come nel core (NotificaClient)
+    public static final String TIPO_EVENTO_NOTIFICA_RICEVUTA = "notificaRicevuta";
 
     private Costanti() {
         // Costruttore privato per evitare istanziazione

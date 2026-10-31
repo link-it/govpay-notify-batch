@@ -3,30 +3,50 @@ package it.govpay.notify.batch.unit.rt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import it.govpay.ec.client.beans.EsitoRpp;
+import it.govpay.ec.client.beans.ModelloPagamento;
+import it.govpay.ec.client.beans.PendenzaPagata;
 import it.govpay.ec.client.beans.Ricevuta;
 import it.govpay.ec.client.beans.RicevutaRt;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.rt.service.PendenzaPagataMapper;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
+import it.govpay.pendenze.entity.Pagamento;
+import it.govpay.pendenze.entity.Pendenza;
 
 @DisplayName("RicevutaV2Mapper")
 class RicevutaV2MapperTest {
 
     private RicevutaV2Mapper mapper;
+    private PendenzaPagataMapper pendenzaPagataMapper;
+    private final Pendenza pendenza = new Pendenza();
+    private final PendenzaPagata pendenzaPagata = new PendenzaPagata();
 
     @BeforeEach
     void setUp() {
-        mapper = new RicevutaV2Mapper(ZoneId.of("Europe/Rome"));
+        pendenzaPagataMapper = mock(PendenzaPagataMapper.class);
+        when(pendenzaPagataMapper.toPendenzaPagata(any(), any())).thenReturn(pendenzaPagata);
+        mapper = new RicevutaV2Mapper(ZoneId.of("Europe/Rome"), pendenzaPagataMapper);
+    }
+
+    private Ricevuta toRicevuta(Rpt rpt) {
+        return mapper.toRicevuta(rpt, pendenza, List.of());
     }
 
     private Rpt baseRpt() {
@@ -41,7 +61,7 @@ class RicevutaV2MapperTest {
                 .modelloPagamento("1")
                 .dataMsgRicevuta(LocalDateTime.of(2026, 6, 1, 10, 30))
                 .codEsitoPagamento(0)
-                .importoTotalePagato(new BigDecimal("12.34"))
+                .importoTotalePagato(12.34)
                 .xmlRt("<rt/>".getBytes())
                 .tipoIdentificativoAttestante("B")
                 .identificativoAttestante("BNLIITRR")
@@ -56,7 +76,7 @@ class RicevutaV2MapperTest {
     @Test
     @DisplayName("mappa i campi base, l'istituto attestante e il body RT (CT_RECEIPT)")
     void mapsAllFields() {
-        Ricevuta r = mapper.toRicevuta(baseRpt());
+        Ricevuta r = toRicevuta(baseRpt());
 
         assertNotNull(r.getDominio());
         assertEquals("12345678901", r.getDominio().getIdDominio());
@@ -78,11 +98,30 @@ class RicevutaV2MapperTest {
     }
 
     @Test
+    @DisplayName("pendenza dal PendenzaPagataMapper, con le riscossioni della RPT, e modello PSP")
+    void pendenzaEModello() {
+        List<Pagamento> pagamenti = List.of(new Pagamento());
+
+        Ricevuta r = mapper.toRicevuta(baseRpt(), pendenza, pagamenti);
+
+        assertSame(pendenzaPagata, r.getPendenza());
+        assertEquals(ModelloPagamento.PAGAMENTO_AD_INIZIATIVA_PSP, r.getModello());
+        Mockito.verify(pendenzaPagataMapper).toPendenzaPagata(pendenza, pagamenti);
+    }
+
+    @Test
+    @DisplayName("pendenza della RPT non trovata -> IllegalStateException (notifica annullata)")
+    void pendenzaNonTrovata() {
+        Rpt rpt = baseRpt();
+        assertThrows(IllegalStateException.class, () -> mapper.toRicevuta(rpt, null, List.of()));
+    }
+
+    @Test
     @DisplayName("SANP_230 produce un RT con tipo CT_RICEVUTA_TELEMATICA")
     void sanp230ToCtRicevutaTelematica() {
         Rpt rpt = baseRpt();
         rpt.setVersione("SANP_230");
-        Ricevuta r = mapper.toRicevuta(rpt);
+        Ricevuta r = toRicevuta(rpt);
         assertEquals(RicevutaRt.TipoEnum.CT_RICEVUTA_TELEMATICA, r.getRt().getTipo());
     }
 
@@ -91,7 +130,7 @@ class RicevutaV2MapperTest {
     void noXmlRtNoRtBody() {
         Rpt rpt = baseRpt();
         rpt.setXmlRt(null);
-        Ricevuta r = mapper.toRicevuta(rpt);
+        Ricevuta r = toRicevuta(rpt);
         assertNull(r.getRt());
     }
 
@@ -100,7 +139,7 @@ class RicevutaV2MapperTest {
     void noAttestanteNoIstituto() {
         Rpt rpt = baseRpt();
         rpt.setIdentificativoAttestante(null);
-        Ricevuta r = mapper.toRicevuta(rpt);
+        Ricevuta r = toRicevuta(rpt);
         assertNull(r.getIstitutoAttestante());
     }
 
@@ -110,7 +149,7 @@ class RicevutaV2MapperTest {
         Rpt rpt = baseRpt();
         rpt.setDataMsgRicevuta(null);
 
-        Ricevuta r = mapper.toRicevuta(rpt);
+        Ricevuta r = toRicevuta(rpt);
 
         assertNull(r.getData());
         assertNull(r.getDataPagamento());
@@ -122,9 +161,20 @@ class RicevutaV2MapperTest {
         Rpt rpt = baseRpt();
         rpt.setCodEsitoPagamento(null);
 
-        Ricevuta r = mapper.toRicevuta(rpt);
+        Ricevuta r = toRicevuta(rpt);
 
         assertNull(r.getEsito());
+    }
+
+    @Test
+    @DisplayName("importo totale pagato assente -> importo non valorizzato")
+    void importoTotalePagatoAssente() {
+        Rpt rpt = baseRpt();
+        rpt.setImportoTotalePagato(null);
+
+        Ricevuta r = toRicevuta(rpt);
+
+        assertNull(r.getImporto());
     }
 
     @Test
@@ -132,7 +182,7 @@ class RicevutaV2MapperTest {
     void unknownEsito() {
         Rpt rpt = baseRpt();
         rpt.setCodEsitoPagamento(99);
-        assertThrows(IllegalArgumentException.class, () -> mapper.toRicevuta(rpt));
+        assertThrows(IllegalArgumentException.class, () -> toRicevuta(rpt));
     }
 
     @Test
@@ -148,6 +198,6 @@ class RicevutaV2MapperTest {
     private EsitoRpp mapEsito(int code) {
         Rpt rpt = baseRpt();
         rpt.setCodEsitoPagamento(code);
-        return mapper.toRicevuta(rpt).getEsito();
+        return toRicevuta(rpt).getEsito();
     }
 }

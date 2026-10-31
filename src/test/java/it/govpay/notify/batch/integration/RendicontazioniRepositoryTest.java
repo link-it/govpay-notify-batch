@@ -3,6 +3,7 @@ package it.govpay.notify.batch.integration;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -14,12 +15,12 @@ import org.springframework.test.context.ActiveProfiles;
 
 import it.govpay.common.entity.ApplicazioneEntity;
 import it.govpay.common.entity.DominioEntity;
-import it.govpay.notify.batch.entity.Applicazione;
 import it.govpay.notify.batch.entity.Fr;
 import it.govpay.notify.batch.entity.Rendicontazione;
-import it.govpay.notify.batch.entity.SingoloVersamento;
-import it.govpay.notify.batch.entity.Versamento;
 import it.govpay.notify.batch.repository.RendicontazioniRepository;
+import it.govpay.pendenze.entity.Pendenza;
+import it.govpay.pendenze.entity.VocePendenza;
+import it.govpay.pendenze.model.StatoVocePendenza;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
@@ -50,6 +51,15 @@ class RendicontazioniRepositoryTest {
 
     @BeforeEach
     void setUp() {
+        // Lo schema H2 nasce dall'unione delle entity del batch e di govpay-common-pendenze,
+        // che mappano entrambe fr e rendicontazioni: queste colonne sono obbligatorie solo per
+        // la libreria e le entity del batch non le scrivono. Lo schema reale e' verificato da
+        // SchemaV3IntegrationTest.
+        for (String colonna : List.of("fr.obsoleto", "fr.stato", "fr.cod_dominio", "rendicontazioni.stato")) {
+            String[] parti = colonna.split("\\.");
+            entityManager.createNativeQuery("ALTER TABLE " + parti[0] + " ALTER COLUMN " + parti[1] + " SET NULL")
+                    .executeUpdate();
+        }
         rendicontazioniRepository.deleteAll();
     }
 
@@ -124,10 +134,7 @@ class RendicontazioniRepositoryTest {
                 .idUtenza(prossimaIdUtenza++)
                 .build();
         entityManager.persist(app);
-        Applicazione applicazione = entityManager.find(Applicazione.class, app.getId());
-
-        Versamento versamento = Versamento.builder().dominio(dominio).applicazione(applicazione).build();
-        entityManager.persist(versamento);
+        VocePendenza voce = persistVoce(dominio, app, "");
 
         Fr fr = Fr.builder()
                 .dominio(dominio)
@@ -138,11 +145,8 @@ class RendicontazioniRepositoryTest {
                 .build();
         entityManager.persist(fr);
 
-        SingoloVersamento sv = SingoloVersamento.builder().versamento(versamento).build();
-        entityManager.persist(sv);
-
         entityManager.persist(Rendicontazione.builder()
-                .fr(fr).singoloVersamento(sv).iuv(IUV).iur(IUR).importoPagato(100.0).build());
+                .fr(fr).idSingoloVersamento(voce.getId()).iuv(IUV).iur(IUR).importoPagato(100.0).build());
         entityManager.flush();
         entityManager.clear();
 
@@ -163,7 +167,7 @@ class RendicontazioniRepositoryTest {
         entityManager.persist(fr);
 
         entityManager.persist(Rendicontazione.builder()
-                .fr(fr).singoloVersamento(null).iuv(IUV).iur(IUR).importoPagato(100.0).build());
+                .fr(fr).idSingoloVersamento(null).iuv(IUV).iur(IUR).importoPagato(100.0).build());
         entityManager.flush();
         entityManager.clear();
 
@@ -227,10 +231,7 @@ class RendicontazioniRepositoryTest {
                 .idUtenza(prossimaIdUtenza++)
                 .build();
         entityManager.persist(app);
-        Applicazione applicazione = entityManager.find(Applicazione.class, app.getId());
-
-        Versamento versamento = Versamento.builder().dominio(dominio).applicazione(applicazione).build();
-        entityManager.persist(versamento);
+        VocePendenza voce = persistVoce(dominio, app, suffix);
 
         Fr fr = Fr.builder()
                 .dominio(dominio)
@@ -241,12 +242,9 @@ class RendicontazioniRepositoryTest {
                 .build();
         entityManager.persist(fr);
 
-        SingoloVersamento sv = SingoloVersamento.builder().versamento(versamento).build();
-        entityManager.persist(sv);
-
         Rendicontazione rnd = Rendicontazione.builder()
                 .fr(fr)
-                .singoloVersamento(sv)
+                .idSingoloVersamento(voce.getId())
                 .iuv(iuv)
                 .iur(iur)
                 .importoPagato(100.0)
@@ -254,6 +252,32 @@ class RendicontazioniRepositoryTest {
                 .build();
         entityManager.persist(rnd);
         return rnd;
+    }
+
+    /** Pendenza v3 con una voce, scritta con le entity di govpay-common-pendenze. */
+    private VocePendenza persistVoce(DominioEntity dominio, ApplicazioneEntity app, String suffix) {
+        OffsetDateTime adesso = OffsetDateTime.now();
+        Pendenza pendenza = new Pendenza();
+        pendenza.setIdDominio(dominio.getId());
+        pendenza.setIdApplicazione(app.getId());
+        pendenza.setIdPendenza("PND" + suffix);
+        pendenza.setIdTipoPendenza(1L);
+        pendenza.setIdTipoVersamento(1L);
+        pendenza.setNumeroRata(-1);
+        pendenza.setImporto(100.0);
+        pendenza.setDataCreazione(adesso);
+        pendenza.setDataUltimoAggiornamento(adesso);
+
+        VocePendenza voce = new VocePendenza();
+        voce.setIdVocePendenza("VOCE" + suffix);
+        voce.setImporto(100.0);
+        voce.setIndice(1);
+        voce.setIdDominio(dominio.getId());
+        voce.setStato(StatoVocePendenza.ESEGUITO);
+        pendenza.addVocePendenza(voce);
+
+        entityManager.persist(pendenza);
+        return voce;
     }
 
     private DominioEntity buildDominio(String codDominio) {

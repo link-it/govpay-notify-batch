@@ -4,12 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.util.Map;
@@ -39,6 +44,8 @@ import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.entity.Applicazione;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.gde.service.GdeService;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
 
@@ -64,6 +71,7 @@ class EnteRicevutaApiServiceHttpTest {
     private ApplicazioneRepository applicazioneRepository;
     private RicevutaV2Mapper mapper;
     private PlatformTransactionManager transactionManager;
+    private GdeService gdeService;
 
     @BeforeEach
     void setUp() {
@@ -71,13 +79,14 @@ class EnteRicevutaApiServiceHttpTest {
         applicazioneRepository = mock(ApplicazioneRepository.class);
         mapper = mock(RicevutaV2Mapper.class);
         transactionManager = mock(PlatformTransactionManager.class);
+        gdeService = mock(GdeService.class);
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 
         ApplicazioneEntity app = ApplicazioneEntity.builder()
                 .codApplicazione(COD_APP).codConnettoreIntegrazione(COD_CONN).build();
         when(applicazioneRepository.findByCodApplicazione(COD_APP)).thenReturn(Optional.of(app));
         when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Map.of("VERSIONE", "REST_2"));
-        when(mapper.toRicevuta(any())).thenReturn(new Ricevuta());
+        when(mapper.toRicevuta(any(), any(), any())).thenReturn(new Ricevuta());
     }
 
     private EnteRicevutaApiService serviceWith(RestTemplate restTemplate, String baseUrl) {
@@ -89,7 +98,7 @@ class EnteRicevutaApiServiceHttpTest {
         ReflectionTestUtils.setField(config, "timezone", "Europe/Rome");
 
         return new EnteRicevutaApiService(connettoreService, applicazioneRepository, config, mapper,
-                transactionManager, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
+                gdeService, transactionManager, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
     }
 
     private Notifica notifica() {
@@ -118,11 +127,55 @@ class EnteRicevutaApiServiceHttpTest {
                 .andExpect(method(HttpMethod.PUT))
                 .andRespond(withSuccess());
 
-        ResponseEntity<Void> response = service.sendRicevuta(notifica(), rpt());
+        ResponseEntity<Void> response = service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         mockServer.verify();
-        verify(mapper).toRicevuta(any());
+        verify(mapper).toRicevuta(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("chiamata riuscita -> evento GDE con risposta, URL completo e json della ricevuta")
+    void successIsTracedOnGde() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restTemplate).build();
+        EnteRicevutaApiService service = serviceWith(restTemplate, BASE_URL);
+        mockServer.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL))).andRespond(withSuccess());
+        Rpt rpt = rpt();
+        rpt.setCodCarrello("CARRELLO1");
+        NotificaContext ctx = NotificaContext.builder().notifica(notifica()).rpt(rpt).build();
+
+        service.sendRicevuta(ctx);
+
+        verify(gdeService).saveNotificaRicevuta(eq(ctx), notNull(), notNull(), isNull(), notNull(), notNull(),
+                eq(BASE_URL + "/ricevute/12345678901/01234567890123456/CCP1?idCarrello=CARRELLO1"));
+    }
+
+    @Test
+    @DisplayName("errore HTTP -> evento GDE con l'eccezione, che viene poi rilanciata")
+    void failureIsTracedOnGdeAndRethrown() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restTemplate).build();
+        EnteRicevutaApiService service = serviceWith(restTemplate, BASE_URL);
+        mockServer.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL))).andRespond(withServerError());
+        NotificaContext ctx = NotificaContext.builder().notifica(notifica()).rpt(rpt()).build();
+
+        assertThrows(RestClientException.class, () -> service.sendRicevuta(ctx));
+
+        verify(gdeService).saveNotificaRicevuta(eq(ctx), notNull(), isNull(), notNull(), notNull(), notNull(),
+                eq(BASE_URL + "/ricevute/12345678901/01234567890123456/CCP1"));
+    }
+
+    @Test
+    @DisplayName("errore prima della chiamata (versione non supportata) -> nessun evento GDE")
+    void noGdeEventWithoutCallToEnte() {
+        EnteRicevutaApiService service = serviceWith(new RestTemplate(), BASE_URL);
+        when(connettoreService.getConnettoreAsMap(COD_CONN)).thenReturn(Map.of("VERSIONE", "REST_1"));
+        NotificaContext ctx = NotificaContext.builder().notifica(notifica()).rpt(rpt()).build();
+
+        assertThrows(UnsupportedOperationException.class, () -> service.sendRicevuta(ctx));
+
+        verify(gdeService, never()).saveNotificaRicevuta(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -135,15 +188,15 @@ class EnteRicevutaApiServiceHttpTest {
         mockServer.expect(ExpectedCount.twice(), requestTo(org.hamcrest.Matchers.startsWith(BASE_URL)))
                 .andRespond(withSuccess());
 
-        service.sendRicevuta(notifica(), rpt());
-        service.sendRicevuta(notifica(), rpt());
+        service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
+        service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         verify(connettoreService, times(1)).getRestTemplate(COD_CONN);
 
         service.clearCache();
         mockServer.reset();
         mockServer.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL))).andRespond(withSuccess());
-        service.sendRicevuta(notifica(), rpt());
+        service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         verify(connettoreService, times(2)).getRestTemplate(COD_CONN);
         verify(connettoreService).clearCache();
@@ -159,7 +212,7 @@ class EnteRicevutaApiServiceHttpTest {
         // API, dove i timeout vengono applicati alla factory.
         EnteRicevutaApiService service = serviceWith(restTemplate, "http://127.0.0.1:1");
 
-        assertThrows(RestClientException.class, () -> service.sendRicevuta(notifica(), rpt()));
+        assertThrows(RestClientException.class, () -> service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build()));
 
         assertEquals((int) CONNECT_TIMEOUT_MS, ReflectionTestUtils.getField(factory, "connectTimeout"));
         assertEquals((int) READ_TIMEOUT_MS, ReflectionTestUtils.getField(factory, "readTimeout"));
@@ -176,7 +229,7 @@ class EnteRicevutaApiServiceHttpTest {
         Object factoryPrimaDellInvio = restTemplate.getRequestFactory();
         mockServer.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL))).andRespond(withSuccess());
 
-        ResponseEntity<Void> response = service.sendRicevuta(notifica(), rpt());
+        ResponseEntity<Void> response = service.sendRicevuta(NotificaContext.builder().notifica(notifica()).rpt(rpt()).build());
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertSame(factoryPrimaDellInvio, restTemplate.getRequestFactory());

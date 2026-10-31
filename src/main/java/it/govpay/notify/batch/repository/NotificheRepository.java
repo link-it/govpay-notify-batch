@@ -31,7 +31,7 @@ public interface NotificheRepository extends JpaRepository<Notifica, Long> {
      * @param dataLimite valore con cui confrontare la data prossima spedizione (tipicamente {@code now})
      * @param pageable paginazione applicata al reader del batch
      */
-    @Query("SELECT n FROM Notifica n " +
+    @Query("SELECT n FROM NotifyNotifica n " +
            "WHERE n.tipoEsito = :tipoEsito " +
            "  AND n.stato = :stato " +
            "  AND n.dataProssimaSpedizione < :dataLimite " +
@@ -46,7 +46,7 @@ public interface NotificheRepository extends JpaRepository<Notifica, Long> {
      * accettata dall'Ente.
      */
     @Modifying
-    @Query("UPDATE Notifica n SET " +
+    @Query("UPDATE NotifyNotifica n SET " +
            "n.stato = it.govpay.notify.batch.entity.StatoSpedizione.SPEDITO, " +
            "n.descrizioneStato = NULL, " +
            "n.dataAggiornamentoStato = :now " +
@@ -59,7 +59,7 @@ public interface NotificheRepository extends JpaRepository<Notifica, Long> {
      * aggiorna solo descrizione/tentativi/data prossima spedizione.
      */
     @Modifying
-    @Query("UPDATE Notifica n SET " +
+    @Query("UPDATE NotifyNotifica n SET " +
            "n.descrizioneStato = :descrizione, " +
            "n.tentativiSpedizione = :tentativi, " +
            "n.dataProssimaSpedizione = :prossima, " +
@@ -76,7 +76,7 @@ public interface NotificheRepository extends JpaRepository<Notifica, Long> {
      * o errore terminale, la notifica non verra' piu' ripresa.
      */
     @Modifying
-    @Query("UPDATE Notifica n SET " +
+    @Query("UPDATE NotifyNotifica n SET " +
            "n.stato = it.govpay.notify.batch.entity.StatoSpedizione.ANNULLATA, " +
            "n.descrizioneStato = :descrizione, " +
            "n.tentativiSpedizione = :tentativi, " +

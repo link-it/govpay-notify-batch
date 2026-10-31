@@ -21,6 +21,8 @@ import it.govpay.notify.batch.config.EnteApiClientConfig;
 import it.govpay.notify.batch.entity.Applicazione;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
+import it.govpay.notify.batch.gde.service.GdeService;
+import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
 
@@ -49,7 +51,7 @@ class EnteRicevutaApiServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(config, "timezone", "Europe/Rome");
 
         service = new EnteRicevutaApiService(connettoreService, applicazioneRepository,
-                config, mapper, transactionManager, 1000L, 1000L);
+                config, mapper, mock(GdeService.class), transactionManager, 1000L, 1000L);
     }
 
     private Notifica notificaFor(String codApplicazione) {
@@ -64,7 +66,7 @@ class EnteRicevutaApiServiceTest {
     void applicationMissing() {
         when(applicazioneRepository.findByCodApplicazione(any())).thenReturn(Optional.empty());
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
     }
 
     @Test
@@ -76,7 +78,7 @@ class EnteRicevutaApiServiceTest {
                         .codConnettoreIntegrazione(null)
                         .build()));
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
     }
 
     @Test
@@ -88,7 +90,7 @@ class EnteRicevutaApiServiceTest {
                         .codConnettoreIntegrazione("   ")
                         .build()));
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
     }
 
     @Test
@@ -99,7 +101,7 @@ class EnteRicevutaApiServiceTest {
                         .codApplicazione("APP1").codConnettoreIntegrazione("CONN1").build()));
         when(connettoreService.getConnettoreAsMap("CONN1")).thenReturn(Map.of());
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
     }
 
     @Test
@@ -111,7 +113,7 @@ class EnteRicevutaApiServiceTest {
         when(connettoreService.getConnettoreAsMap("CONN1"))
                 .thenReturn(Map.of("VERSIONE", "REST_1"));
         assertThrows(UnsupportedOperationException.class,
-                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
     }
 
     @Test
@@ -123,6 +125,6 @@ class EnteRicevutaApiServiceTest {
         when(connettoreService.getConnettoreAsMap("CONN1"))
                 .thenReturn(Map.of("URL", "https://ente.example.com"));
         assertThrows(UnsupportedOperationException.class,
-                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
+                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
     }
 }
