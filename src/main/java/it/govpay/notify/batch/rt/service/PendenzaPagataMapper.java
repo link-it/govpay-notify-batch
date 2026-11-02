@@ -158,12 +158,17 @@ public class PendenzaPagataMapper {
             case PIANO_RATEALE -> documento.setRata(BigDecimal.valueOf(pendenza.getNumeroRata()));
             case SOLUZIONE_UNICA_ENTRO -> documento.setSoglia(toSoglia(TipoSogliaVincoloPagamento.ENTRO, opzione));
             case SOLUZIONE_UNICA_OLTRE -> documento.setSoglia(toSoglia(TipoSogliaVincoloPagamento.OLTRE, opzione));
-            // RIDOTTO e SCONTATO non sono nella TipoSogliaVincoloPagamento di govpay-ec-client
-            case SOLUZIONE_UNICA, SOLUZIONE_UNICA_RIDOTTO, SOLUZIONE_UNICA_SCONTATO -> { }
+            case SOLUZIONE_UNICA_RIDOTTO -> documento.setSoglia(toSoglia(TipoSogliaVincoloPagamento.RIDOTTO, opzione));
+            case SOLUZIONE_UNICA_SCONTATO -> documento.setSoglia(toSoglia(TipoSogliaVincoloPagamento.SCONTATO, opzione));
+            case SOLUZIONE_UNICA -> { }
         }
         return documento;
     }
 
+    /**
+     * Soglia del documento, come nel monolite: i giorni si inviano solo se l'opzione li ha
+     * (per RIDOTTO e SCONTATO di norma non ci sono).
+     */
     private static VincoloPagamento toSoglia(TipoSogliaVincoloPagamento tipo, OpzionePagamento opzione) {
         VincoloPagamento soglia = new VincoloPagamento();
         soglia.setTipo(tipo);
