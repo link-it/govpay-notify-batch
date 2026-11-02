@@ -32,6 +32,7 @@ import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.tasklet.RtSendReader;
 import it.govpay.pendenze.entity.Pagamento;
 import it.govpay.pendenze.entity.Pendenza;
+import it.govpay.pendenze.service.PosizioneDebitoriaService;
 
 @DisplayName("RtSendReader")
 class RtSendReaderTest {
@@ -41,14 +42,16 @@ class RtSendReaderTest {
     private static final int PAGE_SIZE = 50;
 
     private NotificheRepository repo;
+    private PosizioneDebitoriaService posizioneService;
     private PendenzaNotificaRepository pendenzaRepo;
     private RtSendReader reader;
 
     @BeforeEach
     void setUp() {
         repo = mock(NotificheRepository.class);
+        posizioneService = mock(PosizioneDebitoriaService.class);
         pendenzaRepo = mock(PendenzaNotificaRepository.class);
-        reader = new RtSendReader(repo, pendenzaRepo, Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE), PAGE_SIZE);
+        reader = new RtSendReader(repo, posizioneService, pendenzaRepo, Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE), PAGE_SIZE);
     }
 
     private Notifica notifica(long id) {
@@ -110,7 +113,7 @@ class RtSendReaderTest {
         stubNotifiche(notifica);
         Pendenza pendenza = new Pendenza();
         List<Pagamento> pagamenti = List.of(new Pagamento());
-        when(pendenzaRepo.findConVoci(7L)).thenReturn(Optional.of(pendenza));
+        when(posizioneService.trovaPendenzaCompletaPerId(7L)).thenReturn(Optional.of(pendenza));
         when(pendenzaRepo.findPagamenti(10L)).thenReturn(pagamenti);
 
         NotificaContext ctx = reader.read();

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -42,6 +43,7 @@ import it.govpay.notify.batch.rt.service.PendenzaPagataMapper;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
 import it.govpay.pendenze.entity.Pagamento;
 import it.govpay.pendenze.entity.Pendenza;
+import it.govpay.pendenze.service.PosizioneDebitoriaService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import tools.jackson.databind.JsonNode;
@@ -65,7 +67,7 @@ import tools.jackson.databind.JsonNode;
 })
 @Sql("/db/postgresql/dati-modello-v3.sql")
 @Import({ SchemaV3IntegrationTest.MapperConfig.class, PendenzaPagataMapper.class, RicevutaV2Mapper.class,
-        EnteApiClientConfig.class })
+        EnteApiClientConfig.class, PosizioneDebitoriaService.class })
 @DisplayName("Schema GovPay 3.11.0 (modello v3) su PostgreSQL")
 class SchemaV3IntegrationTest {
 
@@ -87,13 +89,18 @@ class SchemaV3IntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
     }
 
-    /** Anagrafiche di govpay-common e fuso orario, fuori dalla slice JPA. */
+    /** Anagrafiche di govpay-common, fuso orario e orologio, fuori dalla slice JPA. */
     @TestConfiguration
     @EnableJpaRepositories(basePackageClasses = DominioRepository.class)
     static class MapperConfig {
         @Bean
         ZoneId applicationZoneId() {
             return ZoneId.of("Europe/Rome");
+        }
+
+        @Bean
+        Clock applicationClock(ZoneId applicationZoneId) {
+            return Clock.system(applicationZoneId);
         }
     }
 
@@ -105,6 +112,9 @@ class SchemaV3IntegrationTest {
 
     @Autowired
     private RendicontazioniRepository rendicontazioniRepository;
+
+    @Autowired
+    private PosizioneDebitoriaService posizioneDebitoriaService;
 
     @Autowired
     private PendenzaNotificaRepository pendenzaNotificaRepository;
@@ -165,13 +175,14 @@ class SchemaV3IntegrationTest {
     @DisplayName("la ricevuta di una pendenza v3 ha la sezione pendenza e tutti i campi obbligatori dello schema EC")
     void ricevutaConPendenzaV3() {
         Rpt rpt = entityManager.find(Rpt.class, 1L);
-        Pendenza pendenza = pendenzaNotificaRepository.findConVoci(rpt.getIdVersamento()).orElseThrow();
+        Pendenza pendenza = posizioneDebitoriaService.trovaPendenzaCompletaPerId(rpt.getIdVersamento()).orElseThrow();
         List<Pagamento> pagamenti = pendenzaNotificaRepository.findPagamenti(rpt.getId());
+        // Entity staccate: voci e soggetti devono essere gia' caricati, non letti in modo LAZY.
+        entityManager.clear();
         assertEquals(1, pendenza.getVoci().size());
         assertEquals(1, pagamenti.size());
-        assertEquals("RSSMRA80A01H501U", pendenzaNotificaRepository
-                .findSoggettoPrincipale(pendenza.getOpzionePagamento().getPosizioneDebitoria().getId())
-                .orElseThrow().getIdentificativo());
+        assertEquals("RSSMRA80A01H501U", pendenza.getOpzionePagamento().getPosizioneDebitoria()
+                .getSoggettiDebitori().get(0).getIdentificativo());
 
         Ricevuta ricevuta = ricevutaV2Mapper.toRicevuta(rpt, pendenza, pagamenti);
         JsonNode json = enteApiClientConfig.createEnteObjectMapper().valueToTree(ricevuta);
