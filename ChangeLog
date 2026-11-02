@@ -1,3 +1,11 @@
+2026-11-02  Giuliano Pintori <pintori@link.it>
+
+	* [Ricevuta] Soglie RIDOTTO e SCONTATO nella sezione pendenza (issue #30).
+	Le opzioni di pagamento ridotto e scontato inviano ora la soglia del
+	documento, senza giorni, come il monolite. Aggiornato govpay-ec-client a
+	2.0.3-SNAPSHOT, che prevede i due valori e rende facoltativi i giorni
+	(link-it/govpay-ec-client#7).
+
 2026-10-30  Giuliano Pintori <pintori@link.it>
 
 	* [Modello dati v3] Adeguamento a GovPay 3.11.0 (issue #30).

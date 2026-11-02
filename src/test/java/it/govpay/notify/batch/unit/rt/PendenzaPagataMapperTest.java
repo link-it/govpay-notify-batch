@@ -226,13 +226,37 @@ class PendenzaPagataMapperTest {
     }
 
     @Test
-    @DisplayName("opzione migrata da RIDOTTO: documento senza soglia, perche' govpay-ec-client non ha RIDOTTO")
+    @DisplayName("SOLUZIONE_UNICA_OLTRE: soglia OLTRE con i giorni dell'opzione")
+    void soluzioneUnicaOltre() {
+        Pendenza pendenza = pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA_OLTRE, "POS-1");
+        pendenza.getOpzionePagamento().setGiorni(60);
+
+        PendenzaPagata p = mapper.toPendenzaPagata(pendenza, List.of());
+
+        assertEquals(TipoSogliaVincoloPagamento.OLTRE, p.getDocumento().getSoglia().getTipo());
+        assertEquals(new BigDecimal("60"), p.getDocumento().getSoglia().getGiorni());
+    }
+
+    @Test
+    @DisplayName("SOLUZIONE_UNICA_RIDOTTO: soglia RIDOTTO senza giorni")
     void soluzioneUnicaRidotto() {
         PendenzaPagata p = mapper.toPendenzaPagata(
                 pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA_RIDOTTO, "POS-1"), List.of());
 
         assertEquals("POS-1", p.getDocumento().getIdentificativo());
-        assertNull(p.getDocumento().getSoglia());
+        assertEquals(TipoSogliaVincoloPagamento.RIDOTTO, p.getDocumento().getSoglia().getTipo());
+        assertNull(p.getDocumento().getSoglia().getGiorni());
+        assertNull(p.getDocumento().getRata());
+    }
+
+    @Test
+    @DisplayName("SOLUZIONE_UNICA_SCONTATO: soglia SCONTATO senza giorni")
+    void soluzioneUnicaScontato() {
+        PendenzaPagata p = mapper.toPendenzaPagata(
+                pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA_SCONTATO, "POS-1"), List.of());
+
+        assertEquals(TipoSogliaVincoloPagamento.SCONTATO, p.getDocumento().getSoglia().getTipo());
+        assertNull(p.getDocumento().getSoglia().getGiorni());
     }
 
     @Test
