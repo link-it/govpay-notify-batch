@@ -2,7 +2,6 @@ package it.govpay.notify.batch.rt.config;
 
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.job.parameters.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -43,7 +42,6 @@ public class RtSendJobConfiguration {
     @Bean
     public Job rtSendJob(Step rtSendStep) {
         return new JobBuilder(Costanti.RT_SEND_JOB_NAME, jobRepository)
-                .incrementer(new RunIdIncrementer())
                 .start(rtSendStep)
                 .build();
     }
