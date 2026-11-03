@@ -17,9 +17,5 @@ public class BatchProperties {
      */
     private int notifyChunkSize = 1;
 
-    /**
-     * Enable/disable automatic scheduling
-     */
-    private boolean enabled = true;
 
 }
