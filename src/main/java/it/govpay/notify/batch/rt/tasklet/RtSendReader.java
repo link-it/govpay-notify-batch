@@ -19,6 +19,7 @@ import it.govpay.notify.batch.entity.Rpt;
 import it.govpay.notify.batch.repository.NotificheRepository;
 import it.govpay.notify.batch.repository.PendenzaNotificaRepository;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
+import it.govpay.pendenze.service.PosizioneDebitoriaService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -26,7 +27,9 @@ import lombok.extern.slf4j.Slf4j;
  * Riproduce {@code NotificheBD.findNotificheDaSpedire} del monolite.
  * <p>
  * Pendenza e riscossioni si leggono al momento della consegna di ogni notifica, quindi
- * nella transazione del chunk che la elabora, con govpay-common-pendenze.
+ * nella transazione del chunk che la elabora, con govpay-common-pendenze. La pendenza arriva
+ * con voci, opzione, posizione e soggetti debitori gia' caricati
+ * ({@link PosizioneDebitoriaService#trovaPendenzaCompletaPerId}).
  */
 @Component
 @StepScope
@@ -34,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 public class RtSendReader implements ItemReader<NotificaContext> {
 
     private final NotificheRepository notificheRepository;
+    private final PosizioneDebitoriaService posizioneDebitoriaService;
     private final PendenzaNotificaRepository pendenzaNotificaRepository;
     private final Clock clock;
     private final int pageSize;
@@ -41,10 +45,12 @@ public class RtSendReader implements ItemReader<NotificaContext> {
     private List<Notifica> buffer;
 
     public RtSendReader(NotificheRepository notificheRepository,
+                        PosizioneDebitoriaService posizioneDebitoriaService,
                         PendenzaNotificaRepository pendenzaNotificaRepository,
                         Clock clock,
                         @Value("${govpay.batch.rt-send.chunk-size:50}") int pageSize) {
         this.notificheRepository = notificheRepository;
+        this.posizioneDebitoriaService = posizioneDebitoriaService;
         this.pendenzaNotificaRepository = pendenzaNotificaRepository;
         this.clock = clock;
         this.pageSize = pageSize;
@@ -72,7 +78,7 @@ public class RtSendReader implements ItemReader<NotificaContext> {
                 .notifica(notifica)
                 .rpt(rpt)
                 .pendenza(rpt.getIdVersamento() != null
-                        ? pendenzaNotificaRepository.findConVoci(rpt.getIdVersamento()).orElse(null)
+                        ? posizioneDebitoriaService.trovaPendenzaCompletaPerId(rpt.getIdVersamento()).orElse(null)
                         : null)
                 .pagamenti(pendenzaNotificaRepository.findPagamenti(rpt.getId()))
                 .build();

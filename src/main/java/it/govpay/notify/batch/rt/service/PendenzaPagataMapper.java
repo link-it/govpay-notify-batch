@@ -29,7 +29,6 @@ import it.govpay.ec.client.beans.TipoSogliaVincoloPagamento;
 import it.govpay.ec.client.beans.UnitaOperativa;
 import it.govpay.ec.client.beans.VincoloPagamento;
 import it.govpay.ec.client.beans.VocePendenzaPagata;
-import it.govpay.notify.batch.repository.PendenzaNotificaRepository;
 import it.govpay.pendenze.entity.OpzionePagamento;
 import it.govpay.pendenze.entity.Pagamento;
 import it.govpay.pendenze.entity.Pendenza;
@@ -45,7 +44,8 @@ import lombok.extern.slf4j.Slf4j;
  * govpay-common-pendenze. Riprende {@code PendenzePagateConverter} del monolite, con le
  * regole v3:
  * <ul>
- * <li>soggetto pagatore: il soggetto debitore con {@code ordine = 0} della posizione;</li>
+ * <li>soggetto pagatore: il primo soggetto debitore della posizione per {@code ordine}
+ *     (dopo una modifica dei soggetti l'ordine non riparte da 0);</li>
  * <li>documento: la posizione debitoria, tranne quelle create dalla migrazione
  *     ({@code MIGR-<id>}), che prima della 3.11 non esistevano;</li>
  * <li>rata e soglia: da tipologia e giorni dell'opzione di pagamento;</li>
@@ -68,7 +68,6 @@ public class PendenzaPagataMapper {
     /** Codifica del tipo bollo "Imposta di bollo" in {@code singoli_versamenti.tipo_bollo}. */
     private static final String TIPO_BOLLO_IMPOSTA = "01";
 
-    private final PendenzaNotificaRepository pendenzaNotificaRepository;
     private final ApplicazioneRepository applicazioneRepository;
     private final DominioRepository dominioRepository;
     private final UnitaOperativaRepository unitaOperativaRepository;
@@ -77,15 +76,13 @@ public class PendenzaPagataMapper {
     private final IbanAccreditoRepository ibanAccreditoRepository;
     private final ZoneId applicationZoneId;
 
-    public PendenzaPagataMapper(PendenzaNotificaRepository pendenzaNotificaRepository,
-                                ApplicazioneRepository applicazioneRepository,
+    public PendenzaPagataMapper(ApplicazioneRepository applicazioneRepository,
                                 DominioRepository dominioRepository,
                                 UnitaOperativaRepository unitaOperativaRepository,
                                 TipoVersamentoRepository tipoVersamentoRepository,
                                 TributoRepository tributoRepository,
                                 IbanAccreditoRepository ibanAccreditoRepository,
                                 ZoneId applicationZoneId) {
-        this.pendenzaNotificaRepository = pendenzaNotificaRepository;
         this.applicazioneRepository = applicazioneRepository;
         this.dominioRepository = dominioRepository;
         this.unitaOperativaRepository = unitaOperativaRepository;
@@ -96,6 +93,7 @@ public class PendenzaPagataMapper {
     }
 
     /**
+     * @param pendenza pendenza letta con {@code PosizioneDebitoriaService#trovaPendenzaCompletaPerId}
      * @throws PendenzaNonMigrataException se la pendenza non ha opzione di pagamento
      */
     public PendenzaPagata toPendenzaPagata(Pendenza pendenza, List<Pagamento> pagamenti) {
@@ -116,7 +114,8 @@ public class PendenzaPagataMapper {
         rsModel.setDominio(toDominio(pendenza.getIdDominio()));
         rsModel.setUnitaOperativa(toUnitaOperativa(posizione.getIdUnitaOperativa()));
         rsModel.setCausale(toCausale(pendenza, posizione));
-        rsModel.setSoggettoPagatore(pendenzaNotificaRepository.findSoggettoPrincipale(posizione.getId())
+        rsModel.setSoggettoPagatore(posizione.getSoggettiDebitori().stream()
+                .findFirst()
                 .map(PendenzaPagataMapper::toSoggetto)
                 .orElse(null));
         rsModel.setImporto(BigDecimal.valueOf(pendenza.getImporto()));

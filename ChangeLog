@@ -1,5 +1,13 @@
 2026-11-02  Giuliano Pintori <pintori@link.it>
 
+	* [Ricevuta] Lettura della pendenza con govpay-common-pendenze (issue #30).
+	La pendenza della ricevuta, con voci, opzione, posizione e soggetti
+	debitori, si legge con PosizioneDebitoriaService.trovaPendenzaCompletaPerId
+	della libreria (link-it/govpay-common-pendenze#13) al posto delle query del
+	batch. Il soggetto pagatore e' il primo soggetto debitore per ordine: dopo
+	una modifica dei soggetti l'ordine non riparte da 0, e la ricerca per
+	ordine 0 poteva lasciare la ricevuta senza soggetto pagatore.
+
 	* [Ricevuta] Soglie RIDOTTO e SCONTATO nella sezione pendenza (issue #30).
 	Le opzioni di pagamento ridotto e scontato inviano ora la soglia del
 	documento, senza giorni, come il monolite. Aggiornato govpay-ec-client a

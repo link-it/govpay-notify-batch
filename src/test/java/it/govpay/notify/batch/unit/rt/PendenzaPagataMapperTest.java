@@ -39,7 +39,6 @@ import it.govpay.ec.client.beans.TipoRiscossione;
 import it.govpay.ec.client.beans.TipoSoggetto;
 import it.govpay.ec.client.beans.TipoSogliaVincoloPagamento;
 import it.govpay.ec.client.beans.VocePendenzaPagata;
-import it.govpay.notify.batch.repository.PendenzaNotificaRepository;
 import it.govpay.notify.batch.rt.service.PendenzaNonMigrataException;
 import it.govpay.notify.batch.rt.service.PendenzaPagataMapper;
 import it.govpay.pendenze.entity.OpzionePagamento;
@@ -59,7 +58,6 @@ class PendenzaPagataMapperTest {
     private static final long ID_DOMINIO_BENEFICIARIO = 2L;
     private static final long ID_POSIZIONE = 30L;
 
-    private PendenzaNotificaRepository pendenzaNotificaRepository;
     private UnitaOperativaRepository unitaOperativaRepository;
     private TributoRepository tributoRepository;
     private IbanAccreditoRepository ibanAccreditoRepository;
@@ -67,7 +65,6 @@ class PendenzaPagataMapperTest {
 
     @BeforeEach
     void setUp() {
-        pendenzaNotificaRepository = mock(PendenzaNotificaRepository.class);
         ApplicazioneRepository applicazioneRepository = mock(ApplicazioneRepository.class);
         DominioRepository dominioRepository = mock(DominioRepository.class);
         unitaOperativaRepository = mock(UnitaOperativaRepository.class);
@@ -84,21 +81,18 @@ class PendenzaPagataMapperTest {
         TipoVersamentoEntity tipo = new TipoVersamentoEntity();
         tipo.setCodTipoVersamento("IMU");
         when(tipoVersamentoRepository.findById(20L)).thenReturn(Optional.of(tipo));
-        when(pendenzaNotificaRepository.findSoggettoPrincipale(ID_POSIZIONE))
-                .thenReturn(Optional.of(soggetto("RSSMRA80A01H501U")));
 
-        mapper = new PendenzaPagataMapper(pendenzaNotificaRepository, applicazioneRepository, dominioRepository,
-                unitaOperativaRepository, tipoVersamentoRepository, tributoRepository, ibanAccreditoRepository,
-                ZoneId.of("Europe/Rome"));
+        mapper = new PendenzaPagataMapper(applicazioneRepository, dominioRepository, unitaOperativaRepository,
+                tipoVersamentoRepository, tributoRepository, ibanAccreditoRepository, ZoneId.of("Europe/Rome"));
     }
 
     // -------------------------------------------------------------------------
     // Dati di prova
     // -------------------------------------------------------------------------
 
-    private static SoggettoDebitore soggetto(String identificativo) {
+    private static SoggettoDebitore soggetto(String identificativo, int ordine) {
         SoggettoDebitore s = new SoggettoDebitore();
-        s.setOrdine(0);
+        s.setOrdine(ordine);
         s.setTipo(it.govpay.pendenze.model.TipoSoggetto.F);
         s.setIdentificativo(identificativo);
         s.setAnagrafica("Mario Rossi");
@@ -111,6 +105,7 @@ class PendenzaPagataMapperTest {
         posizione.setId(ID_POSIZIONE);
         posizione.setCodDocumento(codDocumento);
         posizione.setDescrizione("Posizione di test");
+        posizione.addSoggettoDebitore(soggetto("RSSMRA80A01H501U", 0));
 
         OpzionePagamento opzione = new OpzionePagamento();
         opzione.setTipologia(tipologia);
@@ -165,7 +160,7 @@ class PendenzaPagataMapperTest {
     // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("SOLUZIONE_UNICA: anagrafiche, soggetto con ordine 0, documento senza rata ne' soglia, voce con riscossione")
+    @DisplayName("SOLUZIONE_UNICA: anagrafiche, primo soggetto debitore, documento senza rata ne' soglia, voce con riscossione")
     void soluzioneUnica() {
         stubTributo("TRIB-1");
 
@@ -267,6 +262,31 @@ class PendenzaPagataMapperTest {
 
         assertNull(p.getDocumento());
         assertEquals("RSSMRA80A01H501U", p.getSoggettoPagatore().getIdentificativo());
+    }
+
+    @Test
+    @DisplayName("soggetti sostituiti da una modifica (ordine da 3): pagatore e' il primo, non quello con ordine 0")
+    void soggettiConOrdineNonDaZero() {
+        Pendenza pendenza = pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA, "POS-1");
+        PosizioneDebitoria posizione = pendenza.getOpzionePagamento().getPosizioneDebitoria();
+        posizione.getSoggettiDebitori().clear();
+        posizione.addSoggettoDebitore(soggetto("VRDLGU80A01H501X", 3));
+        posizione.addSoggettoDebitore(soggetto("BNCLRA80A41H501Y", 4));
+
+        PendenzaPagata p = mapper.toPendenzaPagata(pendenza, List.of());
+
+        assertEquals("VRDLGU80A01H501X", p.getSoggettoPagatore().getIdentificativo());
+    }
+
+    @Test
+    @DisplayName("posizione senza soggetti debitori -> soggetto pagatore assente")
+    void posizioneSenzaSoggetti() {
+        Pendenza pendenza = pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA, "POS-1");
+        pendenza.getOpzionePagamento().getPosizioneDebitoria().getSoggettiDebitori().clear();
+
+        PendenzaPagata p = mapper.toPendenzaPagata(pendenza, List.of());
+
+        assertNull(p.getSoggettoPagatore());
     }
 
     @Test
