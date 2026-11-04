@@ -1,6 +1,7 @@
 package it.govpay.notify.batch.gde.mapper;
 
 import it.govpay.gde.client.beans.*;
+import it.govpay.notify.batch.config.BatchInfraConfig;
 import it.govpay.notify.batch.dto.RtNotifyContext;
 import it.govpay.notify.batch.entity.Rpt;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
@@ -27,7 +28,7 @@ import java.util.List;
 @Component
 public class EventoRtMapper {
 
-    @Value("${govpay.batch.cluster-id}")
+    @Value(BatchInfraConfig.CLUSTER_ID)
     private String clusterId;
 
     /**
