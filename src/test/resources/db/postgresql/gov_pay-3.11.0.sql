@@ -1,5 +1,5 @@
 -- Schema GovPay 3.11.0 per PostgreSQL: copia di src/main/resources/db/sql/postgresql/gov_pay.sql
--- del core GovPay, ramo 3.11.x, commit 9b81ae4a4. Usato da SchemaV3IntegrationTest: va riallineato
+-- del core GovPay, ramo 3.11.x, commit d4b11b61d. Usato da SchemaV3IntegrationTest: va riallineato
 -- quando cambia lo schema del core.
 
 CREATE SEQUENCE seq_configurazione start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
@@ -859,7 +859,11 @@ CREATE TABLE rpt
 	versione VARCHAR(35) NOT NULL,
 	-- fk/pk columns
 	id BIGINT DEFAULT nextval('seq_rpt') NOT NULL,
-	id_versamento BIGINT NOT NULL,
+	-- id_versamento e' NULL per una ricevuta senza pendenza: stazione in broadcast,
+	-- IUV sconosciuto a GovPay. Solo in quel caso id_applicazione riporta
+	-- l'applicazione ricavata dal dominio (govpay-pafornode-api#6).
+	id_versamento BIGINT,
+	id_applicazione BIGINT,
 	-- fk/pk keys constraints
 	CONSTRAINT fk_rpt_id_versamento FOREIGN KEY (id_versamento) REFERENCES versamenti(id),
 	CONSTRAINT pk_rpt PRIMARY KEY (id)
