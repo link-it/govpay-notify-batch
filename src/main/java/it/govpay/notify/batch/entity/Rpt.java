@@ -84,7 +84,8 @@ public class Rpt {
     @Column(name = "cod_canale", length = 35)
     private String codCanale;
 
-    @Column(name = "id_versamento", nullable = false)
+    /** {@code null} per una ricevuta senza pendenza (IUV sconosciuto a GovPay). */
+    @Column(name = "id_versamento")
     private Long idVersamento;
 
     /**
