@@ -100,7 +100,7 @@ Esito della spedizione: con risposta 2xx la notifica passa a `SPEDITO`; con erro
 
 | Proprietà | Default | Descrizione |
 |-----------|---------|-------------|
-| `govpay.batch.cluster-id` | `GovPay-Notify-Batch` | Identificativo del nodo, registrato nelle esecuzioni; nel container è l'indirizzo IP |
+| `govpay.batch.cluster-id` | nome dell'host (nel container l'indirizzo IP) | Identificativo del nodo, registrato nelle esecuzioni, negli eventi del GDE e nel tag `nodo` delle metriche: deve essere diverso su ogni nodo (vedi [Più nodi](#più-nodi)) |
 | `govpay.batch.stale-threshold-minutes` | `120` | Minuti senza aggiornamenti dopo cui un'esecuzione in corso è considerata bloccata e può essere superata |
 | `govpay.batch.job-repository.jdbc.enabled` | `true` | Metadati Spring Batch su database (da `govpay-common`); senza, il coordinamento tra nodi non funziona |
 | `spring.batch.job.enabled` | `false` | Avvio automatico dei job da parte di Spring Boot: resta `false`, i job sono avviati dallo scheduler o dal profilo `cron` |
@@ -165,6 +165,8 @@ I driver JDBC non sono inclusi né nel jar né nel war: vedi [Esecuzione](#esecu
 | `management.endpoint.health.show-details` | `when_authorized` | Dettagli dell'health: il servizio non ha autenticazione, quindi restituisce solo lo stato |
 | `management.health.db.enabled` | `true` | Include la connessione al database nell'health |
 | `management.metrics.tags.application` | `govpay-notify-batch` | Tag che identifica il servizio nelle metriche |
+| `govpay.metrics.batch.enabled` | `true` | Metriche di esecuzione dei job `govpay_batch_*` (vedi [Metriche del batch](#metriche-del-batch)) |
+| `govpay.metrics.batch.tag-nodo` | `true` | Tag `nodo` con il cluster-id su tutte le metriche |
 
 ## Esecuzione
 
@@ -211,6 +213,18 @@ java -Dloader.path=./jdbc-drivers \
      -jar target/govpay-notify-batch.jar --spring.profiles.active=cron
 ```
 
+### Più nodi
+
+Il batch può girare su più nodi collegati allo stesso database: i metadati Spring Batch impediscono che `rtNotifyJob` o `rtSendJob` parta su un nodo mentre è in esecuzione su un altro. Ogni nodo deve avere un `govpay.batch.cluster-id` diverso, altrimenti un'esecuzione in corso altrove è attribuita al nodo corrente e log, API e metriche non indicano il nodo reale.
+
+Se la proprietà non è impostata, il valore è il nome dell'host: la variabile d'ambiente `HOSTNAME` se è passata alla JVM, altrimenti il nome restituito dal sistema operativo, e solo se nessuno dei due è disponibile `GovPay-Batch`, uguale su tutti i nodi. Sulle VM con un nome host distinto non serve configurare nulla; altrimenti va impostato un valore per nodo, con la variabile `GOVPAY_BATCH_CLUSTER_ID` o con la proprietà:
+
+```bash
+java ... -Dgovpay.batch.cluster-id=notify-batch-nodo1 -jar target/govpay-notify-batch.jar
+```
+
+Nel container il valore è impostato dall'entrypoint (vedi [Esecuzione con Docker](#esecuzione-con-docker)).
+
 ### War su application server
 
 Il war si produce con `mvn clean install -P war` (`target/govpay-notify-batch.war`): non è allegato alle release né incluso nell'immagine Docker. Richiede un application server Jakarta EE 11 (Servlet 6.1), per esempio Tomcat 11.
@@ -229,7 +243,7 @@ export CATALINA_OPTS="-Dspring.datasource.jndi-name=java:comp/env/jdbc/govpay"
 cp target/govpay-notify-batch.war $CATALINA_BASE/webapps/
 ```
 
-Il batch gira con lo scheduler interno; API REST e actuator rispondono sotto il context path del war (es. `http://localhost:8080/govpay-notify-batch/actuator/health`).
+Il batch gira con lo scheduler interno; API REST e actuator rispondono sotto il context path del war (es. `http://localhost:8080/govpay-notify-batch/actuator/health`). Il cluster-id predefinito è il nome dell'host, condiviso dagli altri batch installati sullo stesso server: va bene, perché ogni batch ha i propri job, ma tra server diversi i nomi devono essere distinti (vedi [Più nodi](#più-nodi)).
 
 ## Esecuzione con Docker
 
@@ -297,9 +311,35 @@ curl http://localhost:10001/actuator/health       # stato, compresa la connessio
 curl http://localhost:10001/actuator/prometheus   # metriche in formato Prometheus
 ```
 
-Per spostarli su una porta dedicata impostare `management.server.port` (nel container `MANAGEMENT_SERVER_PORT`). L'endpoint `loggers`, che permette di cambiare i livelli di log a caldo, non è esposto di default perché il servizio non ha autenticazione: abilitarlo solo insieme a una porta dedicata e non raggiungibile dall'esterno, per esempio `MANAGEMENT_SERVER_PORT=9090` e `MANAGEMENT_ENDPOINTS=health,info,metrics,prometheus,loggers`. In alternativa i livelli si cambiano dalla console, tramite la tabella `configurazione`.
+Il servizio non ha autenticazione, quindi anche `/actuator/prometheus` risponde a chiunque raggiunga la porta. In produzione conviene spostare gli endpoint actuator su una porta dedicata con `management.server.port` (nel container `MANAGEMENT_SERVER_PORT`), raggiungibile solo dalla rete di monitoraggio. L'endpoint `loggers`, che permette di cambiare i livelli di log a caldo, non è esposto di default perché il servizio non ha autenticazione: abilitarlo solo insieme a una porta dedicata e non raggiungibile dall'esterno, per esempio `MANAGEMENT_SERVER_PORT=9090` e `MANAGEMENT_ENDPOINTS=health,info,metrics,prometheus,loggers`. In alternativa i livelli si cambiano dalla console, tramite la tabella `configurazione`.
 
-Con il profilo `cron` non c'è server HTTP: l'esito si ricava dall'exit code del processo e dai log.
+### Metriche del batch
+
+Oltre alle metriche standard di Spring Boot e Spring Batch (`spring_batch_*`), `govpay-common` pubblica le metriche di esecuzione dei job, senza configurazione nel progetto:
+
+| Serie | Cosa indica |
+|-------|-------------|
+| `govpay_batch_job_seconds_*` | Durata ed esito (`esito`) delle esecuzioni concluse, per provenienza (`trigger`: `SCHEDULED`, `MANUAL`) |
+| `govpay_batch_job_active_seconds_*` | Esecuzioni in corso e da quanto |
+| `govpay_batch_job_last_success_timestamp_seconds`, `govpay_batch_job_last_failure_timestamp_seconds` | Istante dell'ultimo successo e dell'ultimo fallimento |
+| `govpay_batch_schedule_ticks_total` | Tentativi di avvio, per esito del controllo (`esito_tick`, es. `RUNNING_ON_OTHER_NODE`) |
+| `govpay_batch_schedule_interval_seconds` | Intervallo previsto tra due esecuzioni: per `rtNotifyJob` `tipo="fixedDelay"`, `7200` secondi di default; per `rtSendJob`, se abilitato, `tipo="cron"`, distanza tra le due prossime esecuzioni del cron (`60` secondi con il default) |
+| `govpay_batch_stale_threshold_seconds` | Soglia oltre la quale un'esecuzione è considerata bloccata |
+
+Il job è nel tag `job_name` (`rtNotifyJob`, `rtSendJob`). Tutte le metriche dell'applicazione hanno il tag `nodo`, uguale al cluster-id del nodo (vedi [Più nodi](#più-nodi)), oltre ad `application="govpay-notify-batch"`. Nel container il cluster-id è l'indirizzo IP, quindi dopo un riavvio le serie hanno un `nodo` nuovo: le query che non riguardano un nodo specifico vanno aggregate (es. `sum without (nodo, instance)`). Elenco completo dei tag, proprietà e query PromQL per gli allarmi: [metriche di esecuzione dei batch](https://github.com/link-it/govpay-common#metriche-di-esecuzione-dei-batch) nel README di govpay-common.
+
+Esempio di configurazione di Prometheus, con la porta dedicata `9090`:
+
+```yaml
+scrape_configs:
+  - job_name: govpay-notify-batch
+    metrics_path: /actuator/prometheus
+    honor_labels: false   # default: le etichette job e instance del target prevalgono
+    static_configs:
+      - targets: ["notify-batch-nodo1:9090", "notify-batch-nodo2:9090"]
+```
+
+Con il profilo `cron` non c'è server HTTP e il processo termina a fine job, prima di qualsiasi scrape: le metriche non sono disponibili, e l'esito si ricava dall'exit code del processo, dai log e dalle tabelle Spring Batch.
 
 ## Avvio manuale via REST
 
