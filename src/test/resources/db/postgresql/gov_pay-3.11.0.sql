@@ -1,5 +1,5 @@
 -- Schema GovPay 3.11.0 per PostgreSQL: copia di src/main/resources/db/sql/postgresql/gov_pay.sql
--- del core GovPay, ramo 3.11.x, commit d4b11b61d. Usato da SchemaV3IntegrationTest: va riallineato
+-- del core GovPay, ramo 3.11.x, commit d123ecee3. Usato da SchemaV3IntegrationTest: va riallineato
 -- quando cambia lo schema del core.
 
 CREATE SEQUENCE seq_configurazione start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
@@ -555,6 +555,8 @@ CREATE TABLE documenti
 	data_ultimo_aggiornamento TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	-- Versione per il lock ottimistico di govpay-common-pendenze
 	versione BIGINT NOT NULL DEFAULT 0,
+	anomalo BOOLEAN NOT NULL DEFAULT false,
+	descrizione_stato VARCHAR(255),
 	-- fk/pk columns
 	id BIGINT DEFAULT nextval('seq_documenti') NOT NULL,
 	id_dominio BIGINT NOT NULL,
@@ -1152,6 +1154,7 @@ CREATE TABLE eventi
 	dati_pago_pa TEXT,
 	cod_versamento_ente VARCHAR(35),
 	cod_applicazione VARCHAR(35),
+	cod_documento VARCHAR(35),
 	iuv VARCHAR(35),
 	ccp VARCHAR(35),
 	cod_dominio VARCHAR(35),
