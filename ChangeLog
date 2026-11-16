@@ -1,3 +1,12 @@
+2026-11-16  Giuliano Pintori <pintori@link.it>
+
+	* [Release] Ramo 3.11.x: versione 2.1.0-SNAPSHOT
+	Il ramo 3.10.x torna al modello dati di GovPay 3.10 e alla serie 2.0
+	(2.0.1-SNAPSHOT), senza l'adeguamento al modello v3 (issue #30). La 2.1.0,
+	mai rilasciata, e' quindi la prima versione con il modello v3 e resta a
+	questo ramo: la 2.2.0-SNAPSHOT del 2026-11-09 torna 2.1.0-SNAPSHOT. Le
+	SNAPSHOT e le immagini -dev delle due linee restano distinte.
+
 2026-11-09  Giuliano Pintori <pintori@link.it>
 
 	* [Release] Ramo 3.11.x: versione 2.2.0-SNAPSHOT
