@@ -118,10 +118,18 @@ public class EnteRicevutaApiService {
     /**
      * Spedisce la ricevuta all'API di integrazione dell'Ente.
      *
-     * @throws IllegalStateException se l'applicazione o il connettore non sono configurati,
-     *         o se la pendenza della RPT non e' stata trovata
+     * @throws IllegalStateException se l'applicazione o il connettore non sono configurati
      * @throws UnsupportedOperationException se la versione del connettore non e' supportata
-     * @throws PendenzaNonMigrataException se la pendenza non e' nel modello v3
+     */
+    public ResponseEntity<Void> sendRicevuta(Notifica notifica, Rpt rpt) {
+        return sendRicevuta(NotificaContext.builder().notifica(notifica).rpt(rpt).build());
+    }
+
+    /**
+     * Spedisce la ricevuta all'API di integrazione dell'Ente e registra l'evento nel GDE.
+     *
+     * @throws IllegalStateException se l'applicazione o il connettore non sono configurati
+     * @throws UnsupportedOperationException se la versione del connettore non e' supportata
      */
     public ResponseEntity<Void> sendRicevuta(NotificaContext ctx) {
         Notifica notifica = ctx.getNotifica();
@@ -131,7 +139,7 @@ public class EnteRicevutaApiService {
         verificaVersioneSupportata(codConnettore);
 
         NotificaRicevuteApi api = getOrCreateApi(codConnettore);
-        Ricevuta payload = ricevutaV2Mapper.toRicevuta(rpt, ctx.getPendenza(), ctx.getPagamenti());
+        Ricevuta payload = ricevutaV2Mapper.toRicevuta(rpt);
 
         log.debug("Spedizione ricevuta RT a {} (codDominio={}, iuv={}, ccp={})",
                 codApplicazione, rpt.getCodDominio(), rpt.getIuv(), rpt.getCcp());

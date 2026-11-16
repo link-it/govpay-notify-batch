@@ -11,7 +11,6 @@ import it.govpay.notify.batch.rt.dto.NotificaContext;
 import it.govpay.notify.batch.rt.dto.RtSendOutcome;
 import it.govpay.notify.batch.rt.dto.RtSendResult;
 import it.govpay.notify.batch.rt.service.EnteRicevutaApiService;
-import it.govpay.notify.batch.rt.service.PendenzaNonMigrataException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -34,7 +33,7 @@ public class RtSendProcessor implements ItemProcessor<NotificaContext, RtSendRes
         long tentativiBase = notifica.getTentativiSpedizione() == null ? 0L : notifica.getTentativiSpedizione();
 
         try {
-            ResponseEntity<Void> response = enteRicevutaApiService.sendRicevuta(ctx);
+            ResponseEntity<Void> response = enteRicevutaApiService.sendRicevuta(notifica, ctx.getRpt());
             log.debug("Ricevuta notificata: notificaId={}, status={}", notifica.getId(), response.getStatusCode());
 
             return RtSendResult.builder()
@@ -51,7 +50,7 @@ public class RtSendProcessor implements ItemProcessor<NotificaContext, RtSendRes
                     .tentativiSpedizione(tentativiBase + 1)
                     .build();
 
-        } catch (RestClientException | PendenzaNonMigrataException e) {
+        } catch (RestClientException e) {
             log.warn("Errore spedizione RT (notificaId={}): {}", notifica.getId(), e.getMessage());
             return RtSendResult.builder()
                     .notificaId(notifica.getId())

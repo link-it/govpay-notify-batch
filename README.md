@@ -23,7 +23,7 @@ Il batch esegue due job Spring Batch sul database di GovPay:
 
 L'endpoint dell'Ente si ricava dal connettore di integrazione dell'applicazione, configurato in GovPay (tabella `connettori`): il batch supporta solo connettori con versione API `REST_2`. Le chiamate di entrambi i job sono registrate nel Giornale degli Eventi.
 
-Il batch richiede **GovPay 3.11.0 o successivo**: le pendenze si leggono nel modello dati v3 (posizioni debitorie, opzioni di pagamento, soggetti debitori) con la libreria `govpay-common-pendenze`, e il batch non gira su un database GovPay 3.10.
+Questa è la linea per **GovPay 3.10** (ramo `3.10.x`). Per GovPay 3.11, con il modello dati v3 delle pendenze, si usa la linea 2.1 (ramo `3.11.x`).
 
 Il job si avvia da uno scheduler interno (modalità di default), una sola volta con il profilo `cron`, oppure a richiesta con l'API REST descritta in [Avvio manuale via REST](#avvio-manuale-via-rest). Le esecuzioni sono coordinate tra più nodi tramite i metadati Spring Batch sul database.
 
@@ -33,11 +33,10 @@ Storico delle modifiche nel [ChangeLog](ChangeLog).
 
 | Componente | Quando serve | Obbligatorio | Ruolo |
 |------------|--------------|--------------|-------|
-| Database di GovPay 3.11.0 o successivo | runtime | sì | Legge `fr`, `rendicontazioni`, `rpt`, `applicazioni`, `domini`, `connettori` e `configurazione`; le pendenze nel modello v3 (`versamenti`, `singoli_versamenti`, `documenti`, `opzioni_pagamento`, `soggetti_debitori`, `pagamenti`) e le anagrafiche della ricevuta (`uo`, `tipi_versamento`, `tributi`, `tipi_tributo`, `iban_accredito`); aggiorna `rendicontazioni.notifica_inviata` e lo stato delle righe di `notifiche`. Le tabelle sono create dagli script di installazione di GovPay, il batch non crea lo schema |
+| Database di GovPay 3.10 | runtime | sì | Legge `fr`, `rendicontazioni`, `rpt`, `versamenti`, `singoli_versamenti`, `applicazioni`, `domini`, `connettori` e `configurazione`; aggiorna `rendicontazioni.notifica_inviata` e lo stato delle righe di `notifiche`. Le tabelle sono create dagli script di installazione di GovPay, il batch non crea lo schema |
 | Tabelle Spring Batch | runtime | sì | Metadati delle esecuzioni (`batch_job_*`, `batch_step_*`), usati anche per evitare esecuzioni concorrenti tra nodi. Lo schema è nel pacchetto `sql.zip` (vedi [Compilazione](#compilazione)) e l'immagine Docker può crearlo all'avvio |
 | [govpay-bom](https://github.com/link-it/govpay-bom) | build | sì | Parent Maven: versioni delle dipendenze e dei plugin, profilo `dist` |
 | [govpay-common](https://github.com/link-it/govpay-common) | build | sì | Libreria comune: connettori, entità di anagrafica, coordinamento dei job, API REST del batch, client GDE, transaction id e livelli di log da database |
-| [govpay-common-pendenze](https://github.com/link-it/govpay-common-pendenze) | build | sì | Entity e repository delle pendenze nel modello dati v3 di GovPay 3.11 |
 | [govpay-ec-client](https://github.com/link-it/govpay-ec-client) | build | sì | Client generato dell'API di integrazione dell'Ente Creditore (`NotificaRendicontazioniApi`, `NotificaRicevuteApi`) |
 | API di integrazione dell'Ente | runtime | sì | Servizio dell'Ente che riceve rendicontazioni e ricevute. URL, autenticazione e versione (`REST_2`) sono nel connettore di integrazione dell'applicazione |
 | [govpay-fdr-batch](https://github.com/link-it/govpay-fdr-batch) | runtime | sì | Acquisisce da pagoPA i flussi di rendicontazione (`fr`, `rendicontazioni`) che `rtNotifyJob` notifica |
@@ -56,7 +55,7 @@ mvn clean install -P jar     # fat jar, per esecuzione standalone e container (p
 mvn clean install -P war     # war, per il deploy su application server
 ```
 
-Il profilo sceglie il packaging; il risultato è in `target/govpay-notify-batch.jar` o `target/govpay-notify-batch.war`. In entrambi i casi i driver JDBC non sono inclusi. La build esegue i test, che per lo schema PostgreSQL di GovPay usano Testcontainers e richiedono Docker, e l'analisi OWASP Dependency-Check delle dipendenze; per escludere l'analisi OWASP, per esempio in sviluppo:
+Il profilo sceglie il packaging; il risultato è in `target/govpay-notify-batch.jar` o `target/govpay-notify-batch.war`. In entrambi i casi i driver JDBC non sono inclusi. La build esegue i test e l'analisi OWASP Dependency-Check delle dipendenze; per escludere l'analisi OWASP, per esempio in sviluppo:
 
 ```bash
 mvn clean install -P jar -Dowasp.phase=none
@@ -94,7 +93,7 @@ Le proprietà si impostano in `application.properties`, da riga di comando (`-D<
 | `govpay.batch.rt-send.http.read-timeout-ms` | `30000` | Timeout di lettura della risposta dell'Ente, in ms |
 | `scheduler.rtSendJob.cron` | `0 * * * * *` | Schedulazione (cron Spring a 6 campi: secondi, minuti, ore, giorno, mese, giorno della settimana); di default ogni minuto |
 
-Esito della spedizione: con risposta 2xx la notifica passa a `SPEDITO`; con errore HTTP, timeout o pendenza non migrata al modello v3 resta `DA_SPEDIRE` e viene ritentata dopo `tentativi² × 60` secondi, al massimo dopo 24 ore; se l'applicazione o il connettore non sono configurati, la versione non è supportata o la pendenza non si trova, passa ad `ANNULLATA`.
+Esito della spedizione: con risposta 2xx la notifica passa a `SPEDITO`; con errore HTTP o timeout resta `DA_SPEDIRE` e viene ritentata dopo `tentativi² × 60` secondi, al massimo dopo 24 ore; se l'applicazione o il connettore non sono configurati, o la versione non è supportata, passa ad `ANNULLATA`.
 
 ### Esecuzione e cluster
 
@@ -110,7 +109,6 @@ Esito della spedizione: con risposta 2xx la notifica passa a `SPEDITO`; con erro
 | `spring.main.banner-mode` | `off` | Banner di Spring Boot all'avvio |
 | `spring.jackson.default-property-inclusion` | `non_null` | Esclude i campi nulli dal JSON |
 | `spring.jackson.time-zone` | `Europe/Rome` | Fuso orario dell'applicazione e delle date inviate all'Ente |
-| `govpay.pendenze.fuso-orario` | `${spring.jackson.time-zone}` | Fuso orario delle colonne temporali lette da `govpay-common-pendenze`: va lasciato uguale a quello dell'applicazione |
 
 ### Connettori e client HTTP
 
@@ -379,13 +377,13 @@ Ogni chiamata produce un evento nel GDE (categoria `INTERFACCIA`, ruolo `CLIENT`
 
 Un solo step chunk-oriented (`rtSendStep`):
 
-- **Reader** (`RtSendReader`): legge da `notifiche` le righe di tipo `RICEVUTA` in stato `DA_SPEDIRE` con `data_prossima_spedizione` passata; per ognuna carica con `govpay-common-pendenze` la pendenza della `rpt`, con voci, opzione di pagamento e posizione debitoria, e le riscossioni (`pagamenti`) della `rpt`.
-- **Processor** (`RtSendProcessor`): costruisce la ricevuta (`RicevutaV2Mapper`) con la sezione `pendenza` (`PendenzaPagataMapper`) e la invia con `PUT /ricevute/{idDominio}/{iuv}/{idRicevuta}`.
+- **Reader** (`RtSendReader`): legge da `notifiche` le righe di tipo `RICEVUTA` in stato `DA_SPEDIRE` con `data_prossima_spedizione` passata, con la `rpt` collegata.
+- **Processor** (`RtSendProcessor`): costruisce la ricevuta (`RicevutaV2Mapper`) dai dati della `rpt` e la invia con `PUT /ricevute/{idDominio}/{iuv}/{idRicevuta}`.
 - **Writer** (`RtSendWriter`): aggiorna lo stato di ogni notifica in una transazione propria, come descritto in [Spedizione delle ricevute](#spedizione-delle-ricevute-rtsendjob).
 
-La sezione `pendenza` segue le regole del modello v3: soggetto pagatore dal primo soggetto debitore della posizione per `ordine`, documento dalla posizione debitoria (non per le posizioni `MIGR-<id>` create dalla migrazione), rata e soglia (`ENTRO`, `OLTRE`, `RIDOTTO`, `SCONTATO`, con i giorni quando l'opzione li ha) dall'opzione di pagamento, voci con la riscossione corrispondente. Le pendenze scartate dalla migrazione al modello v3 (tabella `migrazione_v3_scarti`) non hanno opzione di pagamento: la spedizione della loro ricevuta fallisce con un errore non bloccante e riparte dopo la bonifica.
+La ricevuta non comprende la sezione `pendenza`, che il core GovPay 3.10 invia: arriva con la linea 2.1 per GovPay 3.11.
 
-Ogni chiamata all'Ente, riuscita o fallita, produce nel GDE un evento `notificaRicevuta` (componente `API_ENTE`, come nel core GovPay) con dominio, IUV, CCP, applicazione, pendenza, richiesta e risposta. Gli errori che bloccano la spedizione prima della chiamata (configurazione, pendenza non migrata) non producono eventi.
+Ogni chiamata all'Ente, riuscita o fallita, produce nel GDE un evento `notificaRicevuta` (componente `API_ENTE`, come nel core GovPay) con dominio, IUV, CCP, applicazione, richiesta e risposta. Gli errori che bloccano la spedizione prima della chiamata (configurazione) non producono eventi.
 
 ## Licenza
 

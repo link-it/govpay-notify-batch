@@ -25,10 +25,8 @@ import lombok.NoArgsConstructor;
  * + {@code data_prossima_spedizione < now} -> il record va inviato all'Ente.
  * Allineata a {@code it.govpay.bd.model.Notifica} del monolite per i campi
  * letti/aggiornati dal batch.
- * <p>
- * Nome di entity esplicito: govpay-common-pendenze ha anch'essa un'entity {@code Notifica}.
  */
-@Entity(name = "NotifyNotifica")
+@Entity
 @Table(name = "NOTIFICHE")
 @Data
 @Builder

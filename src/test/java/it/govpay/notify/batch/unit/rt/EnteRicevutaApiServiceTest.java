@@ -66,7 +66,7 @@ class EnteRicevutaApiServiceTest {
     void applicationMissing() {
         when(applicazioneRepository.findByCodApplicazione(any())).thenReturn(Optional.empty());
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
     }
 
     @Test
@@ -78,7 +78,7 @@ class EnteRicevutaApiServiceTest {
                         .codConnettoreIntegrazione(null)
                         .build()));
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
     }
 
     @Test
@@ -90,7 +90,7 @@ class EnteRicevutaApiServiceTest {
                         .codConnettoreIntegrazione("   ")
                         .build()));
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
     }
 
     @Test
@@ -101,7 +101,7 @@ class EnteRicevutaApiServiceTest {
                         .codApplicazione("APP1").codConnettoreIntegrazione("CONN1").build()));
         when(connettoreService.getConnettoreAsMap("CONN1")).thenReturn(Map.of());
         assertThrows(IllegalStateException.class,
-                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
     }
 
     @Test
@@ -113,7 +113,7 @@ class EnteRicevutaApiServiceTest {
         when(connettoreService.getConnettoreAsMap("CONN1"))
                 .thenReturn(Map.of("VERSIONE", "REST_1"));
         assertThrows(UnsupportedOperationException.class,
-                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
     }
 
     @Test
@@ -125,6 +125,6 @@ class EnteRicevutaApiServiceTest {
         when(connettoreService.getConnettoreAsMap("CONN1"))
                 .thenReturn(Map.of("URL", "https://ente.example.com"));
         assertThrows(UnsupportedOperationException.class,
-                () -> service.sendRicevuta(NotificaContext.builder().notifica(notificaFor("APP1")).rpt(Rpt.builder().build()).build()));
+                () -> service.sendRicevuta(notificaFor("APP1"), Rpt.builder().build()));
     }
 }

@@ -10,10 +10,8 @@ import java.time.LocalDateTime;
 
 /**
  * Entity representing a single payment
- * <p>
- * Nome di entity esplicito: govpay-common-pendenze ha anch'essa un'entity {@code Rendicontazione}.
  */
-@Entity(name = "NotifyRendicontazione")
+@Entity
 @Table(name = "RENDICONTAZIONI")
 @Data
 @Builder
@@ -33,9 +31,9 @@ public class Rendicontazione {
     @Column(name = "id_pagamento")
     private Long idPagamento;
     
-    /** Voce della pendenza ({@code VocePendenza} di govpay-common-pendenze). */
-    @Column(name = "id_singolo_versamento")
-    private Long idSingoloVersamento;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_singolo_versamento")
+    private SingoloVersamento singoloVersamento;
 
     @Column(name = "data")
     private LocalDateTime data;

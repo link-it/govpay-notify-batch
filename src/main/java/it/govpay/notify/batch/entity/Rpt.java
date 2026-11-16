@@ -1,5 +1,6 @@
 package it.govpay.notify.batch.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -19,10 +20,8 @@ import lombok.NoArgsConstructor;
  * Sono mappati solo i campi necessari alla costruzione del payload
  * {@code it.govpay.ec.client.beans.Ricevuta} (v2 EC API) e al lookup
  * dei parametri della chiamata HTTP.
- * <p>
- * Nome di entity esplicito: govpay-common-pendenze ha anch'essa un'entity {@code Rpt}.
  */
-@Entity(name = "NotifyRpt")
+@Entity
 @Table(name = "RPT")
 @Data
 @Builder
@@ -62,9 +61,8 @@ public class Rpt {
     @Column(name = "cod_esito_pagamento")
     private Integer codEsitoPagamento;
 
-    /** {@code DOUBLE PRECISION} nello schema del core, come gli altri importi. */
     @Column(name = "importo_totale_pagato")
-    private Double importoTotalePagato;
+    private BigDecimal importoTotalePagato;
 
     @Column(name = "xml_rt")
     private byte[] xmlRt;
@@ -84,8 +82,7 @@ public class Rpt {
     @Column(name = "cod_canale", length = 35)
     private String codCanale;
 
-    /** {@code null} per una ricevuta senza pendenza (IUV sconosciuto a GovPay). */
-    @Column(name = "id_versamento")
+    @Column(name = "id_versamento", nullable = false)
     private Long idVersamento;
 
     /**
