@@ -1,3 +1,21 @@
+2026-11-16  Giuliano Pintori <pintori@link.it>
+
+	* [Linea 3.10] Il ramo 3.10.x torna al modello dati di GovPay 3.10.
+	L'adeguamento al modello dati v3 (issue #30) e' arrivato su main prima della
+	nascita dei rami di linea, e il ramo 3.10.x l'aveva ereditato: il batch
+	leggeva soggetti_debitori, opzioni_pagamento e colonne di documenti che
+	esistono solo dallo schema GovPay 3.11, e non partiva su un database 3.10.
+	Annullati i commit del modello v3: niente govpay-common-pendenze, le
+	pendenze tornano alle entity Versamento e SingoloVersamento del batch, i
+	test non usano piu' lo schema PostgreSQL 3.11.0. Restano le modifiche
+	indipendenti dal modello: eventi GDE della spedizione delle ricevute e
+	clearCache, metriche, cluster-id, govpay.batch.enabled, metadati Spring
+	Batch persistenti.
+	La ricevuta inviata all'Ente torna senza la sezione pendenza, come nella
+	2.0.0; l'evento GDE notificaRicevuta non riporta piu' l'idPendenza. Il
+	modello v3 resta sul ramo 3.11.x (linea 2.1).
+	Versione del progetto 2.0.1-SNAPSHOT.
+
 2026-11-03  Giuliano Pintori <pintori@link.it>
 
 	* [Batch] Cluster-id del nodo come default (govpay-common#35, #36).
@@ -32,14 +50,6 @@
 	unica grazie al parametro When.
 
 2026-11-02  Giuliano Pintori <pintori@link.it>
-
-	* [Ricevuta] Lettura della pendenza con govpay-common-pendenze (issue #30).
-	La pendenza della ricevuta, con voci, opzione, posizione e soggetti
-	debitori, si legge con PosizioneDebitoriaService.trovaPendenzaCompletaPerId
-	della libreria (link-it/govpay-common-pendenze#13) al posto delle query del
-	batch. Il soggetto pagatore e' il primo soggetto debitore per ordine: dopo
-	una modifica dei soggetti l'ordine non riparte da 0, e la ricerca per
-	ordine 0 poteva lasciare la ricevuta senza soggetto pagatore.
 
 	* [Ricevuta] Soglie RIDOTTO e SCONTATO nella sezione pendenza (issue #30).
 	Le opzioni di pagamento ridotto e scontato inviano ora la soglia del

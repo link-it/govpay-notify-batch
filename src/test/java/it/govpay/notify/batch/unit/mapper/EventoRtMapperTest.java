@@ -31,7 +31,6 @@ import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.Rpt;
 import it.govpay.notify.batch.gde.mapper.EventoRtMapper;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
-import it.govpay.pendenze.entity.Pendenza;
 
 @DisplayName("EventoRtMapper")
 class EventoRtMapperTest {
@@ -368,23 +367,19 @@ class EventoRtMapperTest {
     @DisplayName("createEventoRicevuta")
     class CreateEventoRicevutaTest {
 
-        private NotificaContext ctx(Pendenza pendenza) {
+        private NotificaContext ctx() {
             return NotificaContext.builder()
                     .notifica(Notifica.builder()
                             .applicazione(Applicazione.builder().codApplicazione("APP1").build())
                             .build())
                     .rpt(Rpt.builder().codDominio(TAX_CODE).iuv(IUV).ccp("CCP1").build())
-                    .pendenza(pendenza)
                     .build();
         }
 
         @Test
-        @DisplayName("riferimenti di RPT, applicazione e pendenza; esito OK senza eccezione")
+        @DisplayName("riferimenti di RPT e applicazione; esito OK senza eccezione")
         void okConRiferimenti() {
-            Pendenza pendenza = new Pendenza();
-            pendenza.setIdPendenza("PEND1");
-
-            NuovoEvento evento = mapper.createEventoRicevuta(ctx(pendenza), "notificaRicevuta", TRANSACTION_ID,
+            NuovoEvento evento = mapper.createEventoRicevuta(ctx(), "notificaRicevuta", TRANSACTION_ID,
                     dataStart, dataEnd, ResponseEntity.ok().build(), null);
 
             assertEquals(EsitoEvento.OK, evento.getEsito());
@@ -394,21 +389,19 @@ class EventoRtMapperTest {
             assertEquals(IUV, evento.getIuv());
             assertEquals("CCP1", evento.getCcp());
             assertEquals("APP1", evento.getIdA2A());
-            assertEquals("PEND1", evento.getIdPendenza());
             assertEquals(TAX_CODE, evento.getDatiPagoPA().getIdDominio());
             assertEquals(5000L, evento.getDurataEvento());
         }
 
         @Test
-        @DisplayName("errore 5xx -> FAIL; pendenza assente -> idPendenza nullo")
-        void failSenzaPendenza() {
-            NuovoEvento evento = mapper.createEventoRicevuta(ctx(null), "notificaRicevuta", TRANSACTION_ID,
+        @DisplayName("errore 5xx -> FAIL")
+        void failErrore5xx() {
+            NuovoEvento evento = mapper.createEventoRicevuta(ctx(), "notificaRicevuta", TRANSACTION_ID,
                     dataStart, dataEnd, null,
                     HttpServerErrorException.create(HttpStatus.BAD_GATEWAY, "Bad Gateway", HttpHeaders.EMPTY, null, null));
 
             assertEquals(EsitoEvento.FAIL, evento.getEsito());
             assertEquals("502", evento.getSottotipoEsito());
-            assertNull(evento.getIdPendenza());
         }
     }
 }

@@ -89,9 +89,6 @@ public class EventoRtMapper {
         nuovoEvento.setIuv(rpt.getIuv());
         nuovoEvento.setCcp(rpt.getCcp());
         nuovoEvento.setIdA2A(ctx.getNotifica().getApplicazione().getCodApplicazione());
-        if (ctx.getPendenza() != null) {
-            nuovoEvento.setIdPendenza(ctx.getPendenza().getIdPendenza());
-        }
         DatiPagoPA datiPagoPA = new DatiPagoPA();
         datiPagoPA.setIdDominio(rpt.getCodDominio());
         nuovoEvento.setDatiPagoPA(datiPagoPA);

@@ -15,21 +15,13 @@ import org.springframework.stereotype.Component;
 import it.govpay.notify.batch.entity.Notifica;
 import it.govpay.notify.batch.entity.StatoSpedizione;
 import it.govpay.notify.batch.entity.TipoNotifica;
-import it.govpay.notify.batch.entity.Rpt;
 import it.govpay.notify.batch.repository.NotificheRepository;
-import it.govpay.notify.batch.repository.PendenzaNotificaRepository;
 import it.govpay.notify.batch.rt.dto.NotificaContext;
-import it.govpay.pendenze.service.PosizioneDebitoriaService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Reader paginato delle notifiche RICEVUTA pronte alla spedizione.
  * Riproduce {@code NotificheBD.findNotificheDaSpedire} del monolite.
- * <p>
- * Pendenza e riscossioni si leggono al momento della consegna di ogni notifica, quindi
- * nella transazione del chunk che la elabora, con govpay-common-pendenze. La pendenza arriva
- * con voci, opzione, posizione e soggetti debitori gia' caricati
- * ({@link PosizioneDebitoriaService#trovaPendenzaCompletaPerId}).
  */
 @Component
 @StepScope
@@ -37,21 +29,15 @@ import lombok.extern.slf4j.Slf4j;
 public class RtSendReader implements ItemReader<NotificaContext> {
 
     private final NotificheRepository notificheRepository;
-    private final PosizioneDebitoriaService posizioneDebitoriaService;
-    private final PendenzaNotificaRepository pendenzaNotificaRepository;
     private final Clock clock;
     private final int pageSize;
 
-    private List<Notifica> buffer;
+    private List<NotificaContext> buffer;
 
     public RtSendReader(NotificheRepository notificheRepository,
-                        PosizioneDebitoriaService posizioneDebitoriaService,
-                        PendenzaNotificaRepository pendenzaNotificaRepository,
                         Clock clock,
                         @Value("${govpay.batch.rt-send.chunk-size:50}") int pageSize) {
         this.notificheRepository = notificheRepository;
-        this.posizioneDebitoriaService = posizioneDebitoriaService;
-        this.pendenzaNotificaRepository = pendenzaNotificaRepository;
         this.clock = clock;
         this.pageSize = pageSize;
     }
@@ -69,19 +55,7 @@ public class RtSendReader implements ItemReader<NotificaContext> {
         if (buffer.isEmpty()) {
             return null;
         }
-        return toContext(buffer.remove(0));
-    }
-
-    private NotificaContext toContext(Notifica notifica) {
-        Rpt rpt = notifica.getRpt();
-        return NotificaContext.builder()
-                .notifica(notifica)
-                .rpt(rpt)
-                .pendenza(rpt.getIdVersamento() != null
-                        ? posizioneDebitoriaService.trovaPendenzaCompletaPerId(rpt.getIdVersamento()).orElse(null)
-                        : null)
-                .pagamenti(pendenzaNotificaRepository.findPagamenti(rpt.getId()))
-                .build();
+        return buffer.remove(0);
     }
 
     private void loadBatch() {
@@ -94,6 +68,12 @@ public class RtSendReader implements ItemReader<NotificaContext> {
 
         log.info("Trovate {} notifiche RT da spedire", notifiche.size());
 
-        buffer = new ArrayList<>(notifiche);
+        buffer = new ArrayList<>(notifiche.size());
+        for (Notifica n : notifiche) {
+            buffer.add(NotificaContext.builder()
+                    .notifica(n)
+                    .rpt(n.getRpt())
+                    .build());
+        }
     }
 }
