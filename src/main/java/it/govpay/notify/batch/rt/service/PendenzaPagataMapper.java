@@ -29,11 +29,11 @@ import it.govpay.ec.client.beans.TipoSogliaVincoloPagamento;
 import it.govpay.ec.client.beans.UnitaOperativa;
 import it.govpay.ec.client.beans.VincoloPagamento;
 import it.govpay.ec.client.beans.VocePendenzaPagata;
+import it.govpay.pendenze.entity.Debitore;
 import it.govpay.pendenze.entity.OpzionePagamento;
 import it.govpay.pendenze.entity.Pagamento;
 import it.govpay.pendenze.entity.Pendenza;
 import it.govpay.pendenze.entity.PosizioneDebitoria;
-import it.govpay.pendenze.entity.SoggettoDebitore;
 import it.govpay.pendenze.entity.VocePendenza;
 import it.govpay.pendenze.exception.CausaleNonLeggibileException;
 import it.govpay.pendenze.service.CausaleVersamentoCodec;
@@ -44,8 +44,7 @@ import lombok.extern.slf4j.Slf4j;
  * govpay-common-pendenze. Riprende {@code PendenzePagateConverter} del monolite, con le
  * regole v3:
  * <ul>
- * <li>soggetto pagatore: il primo soggetto debitore della posizione per {@code ordine}
- *     (dopo una modifica dei soggetti l'ordine non riparte da 0);</li>
+ * <li>soggetto pagatore: il debitore dell'opzione di pagamento pagata;</li>
  * <li>documento: la posizione debitoria, tranne quelle create dalla migrazione
  *     ({@code MIGR-<id>}), che prima della 3.11 non esistevano;</li>
  * <li>rata e soglia: da tipologia e giorni dell'opzione di pagamento;</li>
@@ -114,10 +113,7 @@ public class PendenzaPagataMapper {
         rsModel.setDominio(toDominio(pendenza.getIdDominio()));
         rsModel.setUnitaOperativa(toUnitaOperativa(posizione.getIdUnitaOperativa()));
         rsModel.setCausale(toCausale(pendenza, posizione));
-        rsModel.setSoggettoPagatore(posizione.getSoggettiDebitori().stream()
-                .findFirst()
-                .map(PendenzaPagataMapper::toSoggetto)
-                .orElse(null));
+        rsModel.setSoggettoPagatore(toSoggetto(opzione.getPdDebitore().getDebitore()));
         rsModel.setImporto(BigDecimal.valueOf(pendenza.getImporto()));
         rsModel.setNumeroAvviso(pendenza.getNumeroAvviso());
         rsModel.setDataValidita(toLocalDate(pendenza.getDataValidita()));
@@ -266,7 +262,7 @@ public class PendenzaPagataMapper {
                 .orElse(null);
     }
 
-    private static Soggetto toSoggetto(SoggettoDebitore soggetto) {
+    private static Soggetto toSoggetto(Debitore soggetto) {
         Soggetto rsModel = new Soggetto();
         if (soggetto.getTipo() != null) {
             rsModel.setTipo(TipoSoggetto.fromValue(soggetto.getTipo().name()));

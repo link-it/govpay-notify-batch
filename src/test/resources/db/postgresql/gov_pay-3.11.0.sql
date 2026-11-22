@@ -1,6 +1,15 @@
 -- Schema GovPay 3.11.0 per PostgreSQL: copia di src/main/resources/db/sql/postgresql/gov_pay.sql
 -- del core GovPay, ramo 3.11.x, commit d123ecee3. Usato da SchemaV3IntegrationTest: va riallineato
 -- quando cambia lo schema del core.
+--
+-- Differenza dal core (ramo 3.11.x, non ancora allineato a govpay-common-pendenze 1.0.0, issue #26):
+-- debitori e pd_debitori al posto di soggetti_debitori, opzioni_pagamento agganciata a pd_debitori,
+-- notifica_send e nav_notifica tolte da documenti. Le definizioni sono quelle di
+-- govpay-common-pendenze, db/sql/postgresql/migrazione (02_debitori.sql, 03_opzioni_pagamento.sql).
+-- Da togliere quando lo schema viene ricopiato dal core allineato.
+--
+-- Colonne del core successive a quel commit, necessarie perche' le entity delle librerie le mappano
+-- (ddl-auto=validate): domini.pagamento_sito, versamenti.send_nav, versamenti.data_pubblicazione.
 
 CREATE SEQUENCE seq_configurazione start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
 
@@ -136,6 +145,7 @@ CREATE TABLE domini
 	intermediato BOOLEAN NOT NULL,
 	tassonomia_pago_pa VARCHAR(35),
 	scarica_fr BOOLEAN NOT NULL,
+	pagamento_sito BOOLEAN NOT NULL DEFAULT false,
 	-- fk/pk columns
 	id BIGINT DEFAULT nextval('seq_domini') NOT NULL,
 	id_stazione BIGINT,
@@ -547,8 +557,6 @@ CREATE TABLE documenti
 	descrizione VARCHAR(1024) NOT NULL,
 	id_unita_operativa BIGINT,
 	data_pubblicazione DATE,
-	notifica_send BOOLEAN NOT NULL DEFAULT false,
-	nav_notifica VARCHAR(18),
 	data_ultima_modifica_aca TIMESTAMP,
 	data_ultima_comunicazione_aca TIMESTAMP,
 	data_creazione TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -575,6 +583,57 @@ CREATE INDEX idx_doc_app_data_creaz ON documenti (id_applicazione,data_creazione
 
 
 
+CREATE SEQUENCE seq_debitori start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
+
+CREATE TABLE debitori
+(
+	tipo VARCHAR(1) NOT NULL,
+	identificativo VARCHAR(35) NOT NULL,
+	anagrafica VARCHAR(70),
+	indirizzo VARCHAR(70),
+	civico VARCHAR(16),
+	cap VARCHAR(16),
+	localita VARCHAR(35),
+	provincia VARCHAR(35),
+	nazione VARCHAR(2),
+	email VARCHAR(256),
+	cellulare VARCHAR(35),
+	-- fk/pk columns
+	id BIGINT DEFAULT nextval('seq_debitori') NOT NULL,
+	-- fk/pk keys constraints
+	CONSTRAINT pk_debitori PRIMARY KEY (id)
+);
+
+-- index
+CREATE INDEX idx_deb_identificativo ON debitori (identificativo);
+
+
+
+
+CREATE SEQUENCE seq_pd_debitori start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
+
+CREATE TABLE pd_debitori
+(
+	posizione INT NOT NULL,
+	data_rimozione TIMESTAMP,
+	-- fk/pk columns
+	id BIGINT DEFAULT nextval('seq_pd_debitori') NOT NULL,
+	id_documento BIGINT NOT NULL,
+	id_debitore BIGINT NOT NULL,
+	-- unique constraints
+	CONSTRAINT unique_pd_debitori_1 UNIQUE (id_documento,id_debitore),
+	-- fk/pk keys constraints
+	CONSTRAINT fk_pdd_id_documento FOREIGN KEY (id_documento) REFERENCES documenti(id),
+	CONSTRAINT fk_pdd_id_debitore FOREIGN KEY (id_debitore) REFERENCES debitori(id),
+	CONSTRAINT pk_pd_debitori PRIMARY KEY (id)
+);
+
+-- index
+CREATE INDEX idx_pdd_id_debitore ON pd_debitori (id_debitore);
+
+
+
+
 CREATE SEQUENCE seq_opzioni_pagamento start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
 
 CREATE TABLE opzioni_pagamento
@@ -590,48 +649,16 @@ CREATE TABLE opzioni_pagamento
 	versione BIGINT NOT NULL,
 	-- fk/pk columns
 	id BIGINT DEFAULT nextval('seq_opzioni_pagamento') NOT NULL,
-	id_documento BIGINT NOT NULL,
+	id_pd_debitore BIGINT NOT NULL,
 	-- unique constraints
 	CONSTRAINT unique_opzioni_pagamento_1 UNIQUE (id_opzione_pagamento),
 	-- fk/pk keys constraints
-	CONSTRAINT fk_opz_id_documento FOREIGN KEY (id_documento) REFERENCES documenti(id),
+	CONSTRAINT fk_opz_id_pd_debitore FOREIGN KEY (id_pd_debitore) REFERENCES pd_debitori(id),
 	CONSTRAINT pk_opzioni_pagamento PRIMARY KEY (id)
 );
 
 -- index
-CREATE INDEX idx_opz_id_documento ON opzioni_pagamento (id_documento);
-
-
-
-
-CREATE SEQUENCE seq_soggetti_debitori start 1 increment 1 maxvalue 9223372036854775807 minvalue 1 cache 1 NO CYCLE;
-
-CREATE TABLE soggetti_debitori
-(
-	ordine INT NOT NULL,
-	tipo VARCHAR(1) NOT NULL,
-	identificativo VARCHAR(35) NOT NULL,
-	anagrafica VARCHAR(70),
-	indirizzo VARCHAR(70),
-	civico VARCHAR(16),
-	cap VARCHAR(16),
-	localita VARCHAR(35),
-	provincia VARCHAR(35),
-	nazione VARCHAR(2),
-	email VARCHAR(256),
-	cellulare VARCHAR(35),
-	-- fk/pk columns
-	id BIGINT DEFAULT nextval('seq_soggetti_debitori') NOT NULL,
-	id_documento BIGINT NOT NULL,
-	-- unique constraints
-	CONSTRAINT unique_soggetti_debitori_1 UNIQUE (id_documento,ordine),
-	-- fk/pk keys constraints
-	CONSTRAINT fk_sgd_id_documento FOREIGN KEY (id_documento) REFERENCES documenti(id),
-	CONSTRAINT pk_soggetti_debitori PRIMARY KEY (id)
-);
-
--- index
-CREATE INDEX idx_sgd_identificativo ON soggetti_debitori (identificativo);
+CREATE INDEX idx_opz_id_pd_debitore ON opzioni_pagamento (id_pd_debitore);
 
 
 
@@ -702,6 +729,8 @@ CREATE TABLE versamenti
 	send_abilitato BOOLEAN NOT NULL,
 	send_importo_totale DOUBLE PRECISION,
 	send_data_aggiornamento TIMESTAMP,
+	send_nav VARCHAR(18),
+	data_pubblicazione TIMESTAMP,
 	numero_rata INT NOT NULL DEFAULT -1,
 	-- fk/pk columns
 	id BIGINT DEFAULT nextval('seq_versamenti') NOT NULL,

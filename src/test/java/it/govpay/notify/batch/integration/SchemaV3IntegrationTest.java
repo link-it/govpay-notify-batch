@@ -41,6 +41,7 @@ import it.govpay.notify.batch.repository.PendenzaNotificaRepository;
 import it.govpay.notify.batch.repository.RendicontazioniRepository;
 import it.govpay.notify.batch.rt.service.PendenzaPagataMapper;
 import it.govpay.notify.batch.rt.service.RicevutaV2Mapper;
+import it.govpay.pendenze.config.PendenzeProperties;
 import it.govpay.pendenze.entity.Pagamento;
 import it.govpay.pendenze.entity.Pendenza;
 import it.govpay.pendenze.service.PosizioneDebitoriaService;
@@ -96,6 +97,11 @@ class SchemaV3IntegrationTest {
         @Bean
         ZoneId applicationZoneId() {
             return ZoneId.of("Europe/Rome");
+        }
+
+        @Bean
+        PendenzeProperties pendenzeProperties(ZoneId applicationZoneId) {
+            return new PendenzeProperties(applicationZoneId);
         }
 
         @Bean
@@ -181,8 +187,8 @@ class SchemaV3IntegrationTest {
         entityManager.clear();
         assertEquals(1, pendenza.getVoci().size());
         assertEquals(1, pagamenti.size());
-        assertEquals("RSSMRA80A01H501U", pendenza.getOpzionePagamento().getPosizioneDebitoria()
-                .getSoggettiDebitori().get(0).getIdentificativo());
+        assertEquals("VRDGPP80A01H501X", pendenza.getOpzionePagamento().getPdDebitore()
+                .getDebitore().getIdentificativo());
 
         Ricevuta ricevuta = ricevutaV2Mapper.toRicevuta(rpt, pendenza, pagamenti);
         JsonNode json = enteApiClientConfig.createEnteObjectMapper().valueToTree(ricevuta);
@@ -196,7 +202,7 @@ class SchemaV3IntegrationTest {
         assertEquals("APP_V3", pendenzaJson.get("idA2A").asString());
         assertEquals("PND-V3-1", pendenzaJson.get("idPendenza").asString());
         assertEquals("IMU", pendenzaJson.get("idTipoPendenza").asString());
-        assertEquals("RSSMRA80A01H501U", pendenzaJson.get("soggettoPagatore").get("identificativo").asString());
+        assertEquals("VRDGPP80A01H501X", pendenzaJson.get("soggettoPagatore").get("identificativo").asString());
         assertEquals("POS-V3-1", pendenzaJson.get("documento").get("identificativo").asString());
 
         JsonNode voce = pendenzaJson.get("voci").get(0);
