@@ -41,11 +41,12 @@ import it.govpay.ec.client.beans.TipoSogliaVincoloPagamento;
 import it.govpay.ec.client.beans.VocePendenzaPagata;
 import it.govpay.notify.batch.rt.service.PendenzaNonMigrataException;
 import it.govpay.notify.batch.rt.service.PendenzaPagataMapper;
+import it.govpay.pendenze.entity.Debitore;
 import it.govpay.pendenze.entity.OpzionePagamento;
 import it.govpay.pendenze.entity.Pagamento;
+import it.govpay.pendenze.entity.PdDebitore;
 import it.govpay.pendenze.entity.Pendenza;
 import it.govpay.pendenze.entity.PosizioneDebitoria;
-import it.govpay.pendenze.entity.SoggettoDebitore;
 import it.govpay.pendenze.entity.VocePendenza;
 import it.govpay.pendenze.model.TipoPagamento;
 import it.govpay.pendenze.model.TipologiaOpzionePagamento;
@@ -90,14 +91,18 @@ class PendenzaPagataMapperTest {
     // Dati di prova
     // -------------------------------------------------------------------------
 
-    private static SoggettoDebitore soggetto(String identificativo, int ordine) {
-        SoggettoDebitore s = new SoggettoDebitore();
-        s.setOrdine(ordine);
-        s.setTipo(it.govpay.pendenze.model.TipoSoggetto.F);
-        s.setIdentificativo(identificativo);
-        s.setAnagrafica("Mario Rossi");
-        s.setEmail("mario.rossi@example.org");
-        return s;
+    private static PdDebitore pdDebitore(PosizioneDebitoria posizione, String identificativo, int posizioneDebitore) {
+        Debitore d = new Debitore();
+        d.setTipo(it.govpay.pendenze.model.TipoSoggetto.F);
+        d.setIdentificativo(identificativo);
+        d.setAnagrafica("Mario Rossi");
+        d.setEmail("mario.rossi@example.org");
+
+        PdDebitore pd = new PdDebitore();
+        pd.setDebitore(d);
+        pd.setPosizione(posizioneDebitore);
+        posizione.addPdDebitore(pd);
+        return pd;
     }
 
     private static Pendenza pendenza(TipologiaOpzionePagamento tipologia, String codDocumento) {
@@ -105,11 +110,11 @@ class PendenzaPagataMapperTest {
         posizione.setId(ID_POSIZIONE);
         posizione.setCodDocumento(codDocumento);
         posizione.setDescrizione("Posizione di test");
-        posizione.addSoggettoDebitore(soggetto("RSSMRA80A01H501U", 0));
+        PdDebitore pdDebitore = pdDebitore(posizione, "RSSMRA80A01H501U", 0);
 
         OpzionePagamento opzione = new OpzionePagamento();
         opzione.setTipologia(tipologia);
-        opzione.setPosizioneDebitoria(posizione);
+        pdDebitore.addOpzionePagamento(opzione);
 
         Pendenza pendenza = new Pendenza();
         pendenza.setId(100L);
@@ -265,13 +270,16 @@ class PendenzaPagataMapperTest {
     }
 
     @Test
-    @DisplayName("soggetti sostituiti da una modifica (ordine da 3): pagatore e' il primo, non quello con ordine 0")
-    void soggettiConOrdineNonDaZero() {
+    @DisplayName("posizione con piu' debitori: pagatore e' il debitore dell'opzione pagata, non il primo della posizione")
+    void pagatoreEDebitoreDellOpzionePagata() {
         Pendenza pendenza = pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA, "POS-1");
         PosizioneDebitoria posizione = pendenza.getOpzionePagamento().getPosizioneDebitoria();
-        posizione.getSoggettiDebitori().clear();
-        posizione.addSoggettoDebitore(soggetto("VRDLGU80A01H501X", 3));
-        posizione.addSoggettoDebitore(soggetto("BNCLRA80A41H501Y", 4));
+        PdDebitore secondo = pdDebitore(posizione, "VRDLGU80A01H501X", 1);
+        pdDebitore(posizione, "BNCLRA80A41H501Y", 2);
+        OpzionePagamento opzioneDelSecondo = new OpzionePagamento();
+        opzioneDelSecondo.setTipologia(TipologiaOpzionePagamento.SOLUZIONE_UNICA);
+        secondo.addOpzionePagamento(opzioneDelSecondo);
+        pendenza.setOpzionePagamento(opzioneDelSecondo);
 
         PendenzaPagata p = mapper.toPendenzaPagata(pendenza, List.of());
 
@@ -279,14 +287,14 @@ class PendenzaPagataMapperTest {
     }
 
     @Test
-    @DisplayName("posizione senza soggetti debitori -> soggetto pagatore assente")
-    void posizioneSenzaSoggetti() {
+    @DisplayName("pagatore: tutti i campi dell'anagrafica del debitore sono riportati")
+    void pagatoreCampiAnagrafica() {
         Pendenza pendenza = pendenza(TipologiaOpzionePagamento.SOLUZIONE_UNICA, "POS-1");
-        pendenza.getOpzionePagamento().getPosizioneDebitoria().getSoggettiDebitori().clear();
 
         PendenzaPagata p = mapper.toPendenzaPagata(pendenza, List.of());
 
-        assertNull(p.getSoggettoPagatore());
+        assertEquals("Mario Rossi", p.getSoggettoPagatore().getAnagrafica());
+        assertEquals("mario.rossi@example.org", p.getSoggettoPagatore().getEmail());
     }
 
     @Test

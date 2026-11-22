@@ -1,6 +1,6 @@
 -- Una pendenza pagata e rendicontata, scritta come la scrive govpay-common-pendenze
 -- (modello v3, GovPay 3.11): posizione debitoria su documenti, opzione di pagamento,
--- soggetto debitore in soggetti_debitori e segnaposto in versamenti.debitore_*.
+-- debitori in debitori e pd_debitori e segnaposto in versamenti.debitore_*.
 -- Su di essa una riscossione, una notifica RICEVUTA da spedire e una rendicontazione da notificare.
 
 INSERT INTO intermediari (id, cod_intermediario, cod_connettore_pdd, denominazione, principal, principal_originale, abilitato)
@@ -33,13 +33,18 @@ VALUES (1, true, 1, 1);
 INSERT INTO documenti (id, cod_documento, descrizione, id_dominio, id_applicazione)
 VALUES (1, 'POS-V3-1', 'Posizione debitoria di test', 1, 1);
 
-INSERT INTO opzioni_pagamento (id, id_opzione_pagamento, tipologia, stato, versione,
-        data_creazione, data_ultimo_aggiornamento, id_documento)
-VALUES (1, '6f1c2a3e-0b7d-4c55-9a51-3c2d8e4f5a61', 'SOLUZIONE_UNICA', 'ATTIVATA', 0, now(), now(), 1);
+INSERT INTO debitori (id, tipo, identificativo, anagrafica)
+VALUES (1, 'F', 'RSSMRA80A01H501U', 'Mario Rossi'),
+       (2, 'F', 'VRDGPP80A01H501X', 'Giuseppe Verdi');
 
-INSERT INTO soggetti_debitori (id, ordine, tipo, identificativo, anagrafica, id_documento)
-VALUES (1, 0, 'F', 'RSSMRA80A01H501U', 'Mario Rossi', 1),
-       (2, 1, 'F', 'VRDGPP80A01H501X', 'Giuseppe Verdi', 1);
+INSERT INTO pd_debitori (id, posizione, id_documento, id_debitore)
+VALUES (1, 0, 1, 1),
+       (2, 1, 1, 2);
+
+-- L'opzione pagata e' quella del secondo debitore: il pagatore della ricevuta non e' il primo della posizione.
+INSERT INTO opzioni_pagamento (id, id_opzione_pagamento, tipologia, stato, versione,
+        data_creazione, data_ultimo_aggiornamento, id_pd_debitore)
+VALUES (1, '6f1c2a3e-0b7d-4c55-9a51-3c2d8e4f5a61', 'SOLUZIONE_UNICA', 'ATTIVATA', 0, now(), now(), 2);
 
 INSERT INTO versamenti (id, cod_versamento_ente, importo_totale, stato_versamento, aggiornabile,
         data_creazione, data_ora_ultimo_aggiornamento,
@@ -50,7 +55,7 @@ INSERT INTO versamenti (id, cod_versamento_ente, importo_totale, stato_versament
         id_documento, id_opzione_pagamento)
 VALUES (1, 'PND-V3-1', 100.00, 'ESEGUITO', false,
         now(), now(),
-        'VEDERE_SOGGETTI_DEBITORI', 'Vedere tabella soggetti_debitori', 'VEDERE_SOGGETTI_DEBITORI',
+        'VEDERE_DEBITORI', 'Vedere tabella debitori', 'VEDERE_DEBITORI',
         true, false, 100.00, 0, 'PAGATO', 'DOVUTO', false,
         '01000000000000001', '301000000000000001', 1,
         1, 1, 1, 1,
