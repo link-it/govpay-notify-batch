@@ -5,13 +5,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -28,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
+import it.govpay.common.persistence.config.DatabaseTimezoneAutoConfiguration;
 import it.govpay.common.repository.DominioRepository;
 import it.govpay.ec.client.beans.Ricevuta;
 import it.govpay.notify.batch.config.EnteApiClientConfig;
@@ -67,6 +73,7 @@ import tools.jackson.databind.JsonNode;
         "govpay.batch.job-repository.jdbc.enabled=false"
 })
 @Sql("/db/postgresql/dati-modello-v3.sql")
+@ImportAutoConfiguration(DatabaseTimezoneAutoConfiguration.class)
 @Import({ SchemaV3IntegrationTest.MapperConfig.class, PendenzaPagataMapper.class, RicevutaV2Mapper.class,
         EnteApiClientConfig.class, PosizioneDebitoriaService.class })
 @DisplayName("Schema GovPay 3.11.0 (modello v3) su PostgreSQL")
@@ -90,7 +97,7 @@ class SchemaV3IntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
     }
 
-    /** Anagrafiche di govpay-common, fuso orario e orologio, fuori dalla slice JPA. */
+    /** Anagrafiche di govpay-common, configurazione delle pendenze e orologio, fuori dalla slice JPA. */
     @TestConfiguration
     @EnableJpaRepositories(basePackageClasses = DominioRepository.class)
     static class MapperConfig {
@@ -100,8 +107,8 @@ class SchemaV3IntegrationTest {
         }
 
         @Bean
-        PendenzeProperties pendenzeProperties(ZoneId applicationZoneId) {
-            return new PendenzeProperties(applicationZoneId);
+        PendenzeProperties pendenzeProperties() {
+            return new PendenzeProperties(null);
         }
 
         @Bean
@@ -213,5 +220,31 @@ class SchemaV3IntegrationTest {
         for (String campo : List.of("iuv", "iur", "indice", "tipo", "importo", "data")) {
             assertTrue(riscossione.has(campo), "riscossione senza " + campo);
         }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = { "2027-01-15", "2027-07-15" })
+    @DisplayName("le date alle 00:00 sul database sono lette in ora Europe/Rome e arrivano nella ricevuta con lo stesso giorno")
+    void dateAMezzanotteNellaRicevuta(LocalDate giorno) {
+        // SQL nativo: il valore della colonna non passa dalle conversioni di Hibernate.
+        assertEquals(1, entityManager.createNativeQuery(
+                        "UPDATE versamenti SET data_scadenza = CAST(?1 AS timestamp), data_validita = CAST(?1 AS timestamp)")
+                .setParameter(1, giorno + " 00:00:00")
+                .executeUpdate());
+        entityManager.clear();
+
+        Rpt rpt = entityManager.find(Rpt.class, 1L);
+        Pendenza pendenza = posizioneDebitoriaService.trovaPendenzaCompletaPerId(rpt.getIdVersamento()).orElseThrow();
+
+        Instant mezzanotte = giorno.atStartOfDay(ZoneId.of("Europe/Rome")).toInstant();
+        assertEquals(mezzanotte, pendenza.getDataScadenzaAvviso().toInstant());
+        assertEquals(mezzanotte, pendenza.getDataValidita().toInstant());
+
+        Ricevuta ricevuta = ricevutaV2Mapper.toRicevuta(rpt, pendenza,
+                pendenzaNotificaRepository.findPagamenti(rpt.getId()));
+        JsonNode pendenzaJson = enteApiClientConfig.createEnteObjectMapper().valueToTree(ricevuta).get("pendenza");
+
+        assertEquals(giorno.toString(), pendenzaJson.get("dataScadenza").asString());
+        assertEquals(giorno.toString(), pendenzaJson.get("dataValidita").asString());
     }
 }
