@@ -109,8 +109,7 @@ Esito della spedizione: con risposta 2xx la notifica passa a `SPEDITO`; con erro
 | `spring.application.name` | `govpay-notify-batch` | Nome dell'applicazione nei log |
 | `spring.main.banner-mode` | `off` | Banner di Spring Boot all'avvio |
 | `spring.jackson.default-property-inclusion` | `non_null` | Esclude i campi nulli dal JSON |
-| `spring.jackson.time-zone` | `Europe/Rome` | Fuso orario dell'applicazione e delle date inviate all'Ente |
-| `govpay.pendenze.fuso-orario` | `${spring.jackson.time-zone}` | Fuso orario delle colonne temporali lette da `govpay-common-pendenze`: va lasciato uguale a quello dell'applicazione |
+| `spring.jackson.time-zone` | `Europe/Rome` | Fuso orario dell'applicazione e delle date inviate all'Ente. Va lasciato a `Europe/Rome`, il fuso delle [date sul database](https://github.com/link-it/govpay-common/blob/3.11.x/README.md#date-sul-database) |
 
 ### Connettori e client HTTP
 
